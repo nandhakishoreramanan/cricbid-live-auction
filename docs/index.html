@@ -570,31 +570,117 @@ async function adminAction(cmd){
   renderState(true);
 }
 
+let lastJavaBanner = "";
+
 async function syncFromJavaServer() {
-  if (!javaBackendBase || !session) return false;
+  if (!session) return false;
+  if (!javaBackendBase) {
+    const found = await detectJavaLaptopServer();
+    if (!found) return false;
+  }
   try {
     const who = !session.isAdmin ? `${session.teamName} (${session.username})` : '';
-    const r = await fetch(javaBackendBase + '/api/state?who=' + encodeURIComponent(who));
+    const r = await fetch(javaBackendBase + '/api/state?who=' + encodeURIComponent(who), {cache: 'no-store'});
     if (!r.ok) return false;
     const js = await r.json();
-    const s = getState();
-    s.running = js.running;
-    s.paused = js.paused;
-    s.seconds = js.seconds;
-    s.maxSeconds = js.maxSeconds;
-    s.currentPrice = js.currentPrice;
-    s.leadingTeamId = js.leadingTeamId;
-    s.leadingTeamName = js.leadingTeamName;
-    s.roundHasBids = js.roundHasBids;
-    if (js.player) {
-      const idx = SEED_PLAYERS.findIndex(x => x.name === js.player.name);
-      if (idx >= 0) s.poolIdx = idx;
+
+    document.getElementById('bannerText').textContent =
+      '* [JAVA SERVER SYNCED] Live Sync with Laptop Java Swing + MySQL (' + javaBackendBase + ')';
+
+    // 1. Render Teams Strip directly from Java Server
+    if (js.teams && js.teams.length) {
+      document.getElementById('teamStrip').innerHTML = js.teams.map(t => {
+        const isLead = t.id === js.leadingTeamId;
+        const isYou = !session.isAdmin && t.id === session.teamId;
+        return `<div class="tcard ${isLead?'lead':''} ${isYou?'you':''}">
+          <div class="tname">${isLead?'* ':''}${t.name}${isYou?' [YOU]':' [LIVE]'}</div>
+          <div class="tpurse">${t.purse.toFixed(2)} Cr | ${t.squad}/25</div>
+        </div>`;
+      }).join('');
+      const myT = js.teams.find(t => t.id === (session.teamId || 1));
+      if (myT) {
+        document.getElementById('purseTitle').textContent = `Your Purse (${myT.name}):`;
+        document.getElementById('yourPurse').textContent = `${myT.purse.toFixed(2)} Cr (Squad: ${myT.squad} / 25)`;
+      }
     }
-    if (js.feed && js.feed.length) s.feed = js.feed;
-    saveState(s);
-    renderState(false);
+
+    // 2. Render Active Player Spotlight directly from Java Server (all 48 players supported!)
+    if (js.player) {
+      const p = js.player;
+      document.getElementById('pRole').textContent = p.role;
+      document.getElementById('pOs').textContent = p.overseas ? 'OVERSEAS' : 'DOMESTIC';
+      document.getElementById('pBase').textContent = `Base Price: ${p.basePrice.toFixed(2)} Cr`;
+      document.getElementById('pName').textContent = js.running ? p.name : 'Waiting / Completed';
+      document.getElementById('pSummary').textContent = p.summary;
+      document.getElementById('r1Lbl').textContent = p.row1Label + ':';
+      document.getElementById('r1Fill').style.width = p.row1Pct + '%';
+      document.getElementById('r1Val').textContent = p.row1Val;
+      document.getElementById('r2Lbl').textContent = p.row2Label + ':';
+      document.getElementById('r2Fill').style.width = p.row2Pct + '%';
+      document.getElementById('r2Val').textContent = p.row2Val;
+      document.getElementById('r3Fill').style.width = p.rating + '%';
+      document.getElementById('r3Val').textContent = `${p.rating} / 100`;
+
+      if (p.id !== lastRenderedPlayerId || js.currentPrice !== lastRenderedPrice) {
+        lastRenderedPlayerId = p.id;
+        lastRenderedPrice = js.currentPrice;
+        if (document.activeElement !== document.getElementById('bidInput')) {
+          document.getElementById('bidInput').value = js.nextBid.toFixed(2);
+        }
+      }
+    } else {
+      document.getElementById('pName').textContent = 'Waiting for Host on Laptop to Start Auction...';
+    }
+
+    // 3. Render Timer & Highest Bid directly from Java Server
+    document.getElementById('tSec').textContent = js.paused ? 'PAUSE' : (js.seconds + 's');
+    const col = js.seconds <= 5 ? '#ef4444' : (js.seconds <= 10 ? '#f59e0b' : '#22c55e');
+    document.getElementById('timerRing').style.borderColor = col;
+    const cf = document.getElementById('clockFill');
+    cf.style.width = Math.max(0, (js.seconds / Math.max(1, js.maxSeconds)) * 100) + '%';
+    cf.style.background = col;
+
+    document.getElementById('curPrice').textContent = js.currentPrice.toFixed(2) + ' Cr';
+    document.getElementById('leadTeam').textContent = js.leadingTeamName;
+
+    // 4. Render Live Feed & Chat from Java Server
+    if (js.feed) {
+      const fa = document.getElementById('feedArea');
+      const fText = js.feed.join('\n');
+      if (fa.textContent !== fText) {
+        fa.textContent = fText;
+        fa.scrollTop = fa.scrollHeight;
+      }
+    }
+
+    // 5. Render Upcoming Pool Queue from Java Server
+    if (js.upcoming) {
+      document.getElementById('poolBody').innerHTML = js.upcoming.map(up => `<tr>
+        <td>${up.id}</td>
+        <td><b>${up.name}</b></td>
+        <td style="color:#38bdf8">${up.role}</td>
+        <td>${up.stats}</td>
+        <td>${up.rating}</td>
+        <td style="color:#fbbf24">${up.base.toFixed(2)}</td>
+        <td style="color:#4ade80">AVAILABLE</td>
+      </tr>`).join('');
+    }
+
+    // 6. Show SOLD / UNSOLD toast modal if triggered
+    if (js.bannerEvent && js.bannerEvent !== lastJavaBanner) {
+      lastJavaBanner = js.bannerEvent;
+      document.getElementById('mBadge').textContent = js.bannerEvent.startsWith('SOLD') ? 'HAMMER DOWN - SOLD!' : 'ROUND NOTICE';
+      document.getElementById('mPlayer').textContent = js.bannerEvent;
+      document.getElementById('mTeam').textContent = '';
+      document.getElementById('mPrice').textContent = '';
+      document.getElementById('soldModal').style.display = 'flex';
+    } else if (!js.bannerEvent) {
+      lastJavaBanner = "";
+    }
+
     return true;
   } catch (e) {
+    javaBackendBase = null;
     return false;
   }
 }
@@ -634,13 +720,15 @@ function advancePlayer(s){
   s.feed.push(`>>> * ON THE BLOCK: ${nextP.name} (${nextP.role}) | Base: ${nextP.base.toFixed(2)} Cr`);
 }
 
-// 1-second broadcast clock (syncs from Laptop Java Server if running, otherwise runs 24/7 Cloud Clock)
+// Fast 500ms live sync with Laptop Java Server when connected
 setInterval(async () => {
-  if(!session) return;
-  if(javaBackendBase){
-    const ok = await syncFromJavaServer();
-    if(ok) return;
-  }
+  if (!session) return;
+  await syncFromJavaServer();
+}, 600);
+
+// 1-second fallback clock (only runs when Laptop Java Server is offline)
+setInterval(async () => {
+  if (!session || javaBackendBase) return;
   const s = getState();
   if(!s.running || s.paused) return;
   s.seconds--;
@@ -661,6 +749,10 @@ let lastRenderedPrice = -1;
 
 function renderState(forceInputUpdate=false){
   if(!session) return;
+  if(javaBackendBase) {
+    syncFromJavaServer();
+    return;
+  }
   const s = getState();
   const p = SEED_PLAYERS[s.poolIdx] || SEED_PLAYERS[SEED_PLAYERS.length-1];
 
