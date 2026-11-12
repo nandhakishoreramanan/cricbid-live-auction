@@ -227,6 +227,10 @@ public class WebAuctionPortalServer implements AuctionObserver {
     }
 
     private void handleApiLogin(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
+            sendJson(ex, 200, "{\"ok\":true}");
+            return;
+        }
         if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
             sendJson(ex, 405, "{\"ok\":false,\"error\":\"Method not allowed\"}");
             return;
@@ -429,6 +433,10 @@ public class WebAuctionPortalServer implements AuctionObserver {
     }
 
     private void handleApiBid(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
+            sendJson(ex, 200, "{\"ok\":true}");
+            return;
+        }
         if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
             sendJson(ex, 405, "{\"ok\":false,\"error\":\"Method not allowed\"}");
             return;
@@ -599,6 +607,7 @@ public class WebAuctionPortalServer implements AuctionObserver {
         ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+        ex.getResponseHeaders().set("Access-Control-Allow-Private-Network", "true");
         ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);

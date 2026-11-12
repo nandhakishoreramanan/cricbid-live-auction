@@ -105,10 +105,10 @@ td{padding:6px 8px;border-bottom:1px solid #1e293b;color:#e2e8f0;}
     <div class="login-card">
       <div class="sub">* IPL BROADCAST EDITION | MULTI-LAPTOP LIVE AUCTION *</div>
       <h1>CRICBID LIVE AUCTION ARENA</h1>
-      <div class="lan-banner">[CLOUD + LAN READY] Works 24/7 across Tabs/Laptops or synced with Java Host Server</div>
+      <div id="connBanner" class="lan-banner">[CHECKING...] Checking if Laptop Java Server (localhost:8080) is running...</div>
       <div class="field">
-        <label>Java Host Server IP (Optional — leave 'cloud' for 24/7 Always-On Cloud Mode):</label>
-        <input id="hostInput" value="cloud">
+        <label>Java Host Server IP (Leave 'cloud' or 'localhost' — auto-detects your running Java App):</label>
+        <input id="hostInput" value="localhost">
       </div>
       <div class="field">
         <label>Username:</label>
@@ -294,20 +294,44 @@ async function detectJavaLaptopServer() {
     candidates.push(hostVal.startsWith('http') ? hostVal : `http://${hostVal}:8080`);
   }
   candidates.push('http://localhost:8080');
+  const cb = document.getElementById('connBanner');
+  const ub = document.getElementById('userBadge');
   for (const base of candidates) {
     try {
       const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 700);
+      setTimeout(() => ctrl.abort(), 800);
       const r = await fetch(base + '/api/state', {signal: ctrl.signal});
       if (r.ok) {
         javaBackendBase = base;
+        if (cb) {
+          cb.style.background = '#14532d';
+          cb.style.borderColor = '#4ade80';
+          cb.style.color = '#4ade80';
+          cb.textContent = '* [LAPTOP CONNECTED] Live Java Swing + MySQL Server Detected at ' + base;
+        }
+        if (!session && ub) {
+          ub.style.background = '#14532d';
+          ub.textContent = '* LAPTOP JAVA SERVER CONNECTED (8080)';
+        }
         return true;
       }
     } catch (e) {}
   }
   javaBackendBase = null;
+  if (cb) {
+    cb.style.background = '#0b132b';
+    cb.style.borderColor = '#38bdf8';
+    cb.style.color = '#38bdf8';
+    cb.textContent = '* [24/7 CLOUD MODE] Laptop Java Server Offline — Running Standalone 24/7 Cloud Engine';
+  }
+  if (!session && ub) {
+    ub.style.background = '#1e3a8a';
+    ub.textContent = '* 24/7 CLOUD MODE (Laptop Offline)';
+  }
   return false;
 }
+detectJavaLaptopServer();
+setInterval(() => { if(!session) detectJavaLaptopServer(); }, 3000);
 
 function playTone(freq, durMs, type='sine') {
   if(!soundEnabled) return;
