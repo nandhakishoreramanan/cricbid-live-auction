@@ -284,7 +284,30 @@ const ACCOUNTS = {
 
 let session = null;
 let soundEnabled = true;
+let javaBackendBase = null; // Automatically connects to Laptop Java Server (localhost:8080) if running!
 const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('cricbid_live_channel') : null;
+
+async function detectJavaLaptopServer() {
+  const hostVal = (document.getElementById('hostInput')?.value || '').trim();
+  const candidates = [];
+  if (hostVal && hostVal !== 'cloud') {
+    candidates.push(hostVal.startsWith('http') ? hostVal : `http://${hostVal}:8080`);
+  }
+  candidates.push('http://localhost:8080');
+  for (const base of candidates) {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 700);
+      const r = await fetch(base + '/api/state', {signal: ctrl.signal});
+      if (r.ok) {
+        javaBackendBase = base;
+        return true;
+      }
+    } catch (e) {}
+  }
+  javaBackendBase = null;
+  return false;
+}
 
 function playTone(freq, durMs, type='sine') {
   if(!soundEnabled) return;
@@ -352,23 +375,31 @@ function fillRole(u,p){
   document.getElementById('pInput').value = p;
 }
 
-function doLogin(){
+async function doLogin(){
   const u = document.getElementById('uInput').value.trim().toLowerCase();
+  const p = document.getElementById('pInput').value.trim();
   const acct = ACCOUNTS[u];
   if(!acct){
     document.getElementById('loginErr').textContent = "Invalid username. Try admin, owner1, owner2, owner3...";
     return;
   }
+  await detectJavaLaptopServer();
+  if (javaBackendBase) {
+    try {
+      await fetch(javaBackendBase + '/api/login', {method:'POST', body:new URLSearchParams({username:u, password:p})});
+    } catch (e) {}
+  }
   session = {username: u, ...acct};
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('topNav').style.display = 'flex';
   document.getElementById('arenaView').style.display = 'flex';
-  document.getElementById('userBadge').textContent = session.isAdmin
+  const modeTag = javaBackendBase ? ' [SYNCED WITH JAVA LAPTOP]' : ' [24/7 CLOUD MODE]';
+  document.getElementById('userBadge').textContent = (session.isAdmin
     ? '* AUCTIONEER HOST (admin)'
-    : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')';
-  document.getElementById('bannerText').textContent = session.isAdmin
-    ? '* AUCTIONEER HOST CONSOLE | Controlling Live Broadcast Arena'
-    : '* [LIVE] Connected to Broadcast Arena | Bidding Live as Franchise: ' + session.teamName;
+    : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')') + modeTag;
+  document.getElementById('bannerText').textContent = javaBackendBase
+    ? '* [JAVA SERVER SYNCED] Connected Live to Your Laptop Java Swing + MySQL Server (' + javaBackendBase + ')'
+    : '* [24/7 CLOUD LIVE] Connected to Broadcast Arena | Bidding Live as Franchise: ' + session.teamName;
   renderState(true);
 }
 
@@ -401,17 +432,29 @@ function addInc(inc){
   inp.value = (parseFloat(inp.value || 0) + inc).toFixed(2);
 }
 
-function placeBid(){
+async function placeBid(){
   const errEl = document.getElementById('bidErr');
   errEl.textContent = '';
+  const amt = parseFloat(document.getElementById('bidInput').value);
+  let teamId = session && !session.isAdmin ? session.teamId : 1;
+
+  if (javaBackendBase) {
+    try {
+      const r = await fetch(javaBackendBase + '/api/bid', {method:'POST', body:new URLSearchParams({teamId, amount:amt})});
+      const d = await r.json();
+      if (!d.ok) { errEl.textContent = d.error; playTone(220, 200, 'sawtooth'); return; }
+      playTone(880, 140, 'triangle');
+      await syncFromJavaServer();
+      return;
+    } catch (e) {}
+  }
+
   const s = getState();
   if(!s.running || s.paused){ errEl.textContent = 'Auction is currently paused.'; return; }
   const p = SEED_PLAYERS[s.poolIdx];
   if(!p) return;
 
-  let teamId = session && !session.isAdmin ? session.teamId : 1;
   const team = s.teams.find(t => t.id === teamId);
-  const amt = parseFloat(document.getElementById('bidInput').value);
   const minValid = nextIncrement(s.currentPrice, s.roundHasBids);
 
   if(isNaN(amt) || amt < minValid - 0.001){
@@ -439,18 +482,24 @@ function placeBid(){
   renderState(true);
 }
 
-function passRound(){
-  const s = getState();
+async function passRound(){
   const who = session ? session.teamName : 'Franchise';
+  if (javaBackendBase) {
+    try { await fetch(javaBackendBase + '/api/pass', {method:'POST', body:new URLSearchParams({teamName:who})}); await syncFromJavaServer(); return; } catch(e){}
+  }
+  const s = getState();
   s.feed.push(`  >> [PASS] ${who} passed on the current player.`);
   saveState(s);
   renderState();
 }
 
-function sendChat(txt){
+async function sendChat(txt){
   if(!txt) return;
-  const s = getState();
   const who = session ? (session.isAdmin ? 'Auctioneer Host (admin)' : `${session.teamName} (${session.username})`) : 'Spectator';
+  if (javaBackendBase) {
+    try { await fetch(javaBackendBase + '/api/chat', {method:'POST', body:new URLSearchParams({sender:who, text:txt})}); await syncFromJavaServer(); return; } catch(e){}
+  }
+  const s = getState();
   s.feed.push(`  * [CHAT] ${who}: ${txt}`);
   saveState(s);
   renderState();
@@ -464,7 +513,11 @@ function sendCustomChat(){
   }
 }
 
-function adminAction(cmd){
+async function adminAction(cmd){
+  if (javaBackendBase) {
+    const mapped = (cmd === 'resume' || cmd === 'reset') ? 'start' : cmd;
+    try { await fetch(javaBackendBase + '/api/admin', {method:'POST', body:new URLSearchParams({cmd:mapped})}); await syncFromJavaServer(); return; } catch(e){}
+  }
   let s = getState();
   if(cmd === 'reset'){
     s = defaultState();
@@ -483,6 +536,35 @@ function adminAction(cmd){
   }
   saveState(s);
   renderState(true);
+}
+
+async function syncFromJavaServer() {
+  if (!javaBackendBase || !session) return false;
+  try {
+    const who = !session.isAdmin ? `${session.teamName} (${session.username})` : '';
+    const r = await fetch(javaBackendBase + '/api/state?who=' + encodeURIComponent(who));
+    if (!r.ok) return false;
+    const js = await r.json();
+    const s = getState();
+    s.running = js.running;
+    s.paused = js.paused;
+    s.seconds = js.seconds;
+    s.maxSeconds = js.maxSeconds;
+    s.currentPrice = js.currentPrice;
+    s.leadingTeamId = js.leadingTeamId;
+    s.leadingTeamName = js.leadingTeamName;
+    s.roundHasBids = js.roundHasBids;
+    if (js.player) {
+      const idx = SEED_PLAYERS.findIndex(x => x.name === js.player.name);
+      if (idx >= 0) s.poolIdx = idx;
+    }
+    if (js.feed && js.feed.length) s.feed = js.feed;
+    saveState(s);
+    renderState(false);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function advancePlayer(s){
@@ -520,9 +602,13 @@ function advancePlayer(s){
   s.feed.push(`>>> * ON THE BLOCK: ${nextP.name} (${nextP.role}) | Base: ${nextP.base.toFixed(2)} Cr`);
 }
 
-// 1-second broadcast clock
-setInterval(() => {
+// 1-second broadcast clock (syncs from Laptop Java Server if running, otherwise runs 24/7 Cloud Clock)
+setInterval(async () => {
   if(!session) return;
+  if(javaBackendBase){
+    const ok = await syncFromJavaServer();
+    if(ok) return;
+  }
   const s = getState();
   if(!s.running || s.paused) return;
   s.seconds--;
