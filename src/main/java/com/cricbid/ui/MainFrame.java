@@ -251,10 +251,16 @@ public class MainFrame extends JFrame {
         liveRoomBtn = createToolBarButton("* Live Arena", "Return to the live bidding block",
                 new Color(245, 158, 11), new Color(15, 23, 42), e -> showCard(CARD_LIVE));
 
-        startBtn = createToolBarButton(">> Resume", "Resume countdown (Admin Host only)",
+        startBtn = createToolBarButton(">> Resume", "Continue / Resume countdown from where it stopped (Admin Host)",
                 new Color(22, 163, 74), Color.WHITE, e -> {
             showCard(CARD_LIVE);
-            auctionService.resumeAuction();
+            try {
+                if (!auctionService.isRunning()) {
+                    auctionService.continueOrStartAuction(15, true);
+                } else {
+                    auctionService.resumeAuction();
+                }
+            } catch (SQLException ignored) {}
         });
 
         pauseBtn = createToolBarButton("|| Pause", "Halt the live countdown timer (Admin Host only)",
@@ -262,6 +268,24 @@ public class MainFrame extends JFrame {
 
         nextBtn = createToolBarButton(">> Next Player", "Skip to next available auction player (Admin Host only)",
                 new Color(37, 99, 235), Color.WHITE, e -> auctionService.presentNextPlayer());
+
+        JButton resetInitialBtn = createToolBarButton("[RESET] Initial", "Reset all teams to 100 Cr & restart from Player #1",
+                new Color(180, 83, 9), Color.WHITE, e -> {
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Reset all franchises to 100.00 Cr, clear all squads, and restart from Player #1?",
+                    "Confirm Reset to Initial State", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    java.util.Set<Integer> humanIds = new java.util.HashSet<>(java.util.Arrays.asList(1, 2, 3, 4, 5, 6));
+                    auctionService.resetAuctionToInitialState(100.0, humanIds, 15, true);
+                    if (auctionServer != null) {
+                        auctionServer.broadcastAuctionReset(true);
+                    }
+                    liveAuctionPanel.handleAuctionReset(true);
+                    showCard(CARD_LIVE);
+                } catch (SQLException ignored) {}
+            }
+        });
 
         JButton poolBtn = createToolBarButton("Player Pool", "Search and inspect all cricket players",
                 new Color(30, 41, 59), Color.WHITE, e -> showCard(CARD_POOL));
@@ -295,6 +319,8 @@ public class MainFrame extends JFrame {
         mainToolBar.add(pauseBtn);
         mainToolBar.add(Box.createHorizontalStrut(4));
         mainToolBar.add(nextBtn);
+        mainToolBar.add(Box.createHorizontalStrut(4));
+        mainToolBar.add(resetInitialBtn);
         mainToolBar.addSeparator(new Dimension(12, 24));
         mainToolBar.add(poolBtn);
         mainToolBar.add(Box.createHorizontalStrut(4));
@@ -497,7 +523,9 @@ public class MainFrame extends JFrame {
 
     private void handleLogout() {
         stopNetworking();
-        auctionService.shutdown();
+        if (auctionService.isRunning() && !auctionService.isPaused()) {
+            auctionService.pauseAuction();
+        }
         this.currentUser = null;
         this.currentHumanTeam = null;
         setToolbarAndMenusForSession(false, false);

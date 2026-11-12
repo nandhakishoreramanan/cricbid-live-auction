@@ -249,17 +249,32 @@ public class SetupPanel extends JPanel {
         humanTeamsPanel.setBackground(new Color(15, 23, 42));
         container.add(humanTeamsPanel, gbc);
 
-        // Start button
+        // Continue / Start & Reset buttons row
         gbc.gridy = 7;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
-        JButton startBtn = new JButton(">>  START LIVE MULTI-LAPTOP AUCTION  <<");
-        startBtn.setFont(Main.displayFont(Font.BOLD, 18));
+        JPanel actionBtnRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        actionBtnRow.setOpaque(false);
+
+        JButton startBtn = new JButton(">>  CONTINUE / START AUCTION  <<");
+        startBtn.setFont(Main.displayFont(Font.BOLD, 17));
         startBtn.setBackground(new Color(245, 158, 11));
         startBtn.setForeground(new Color(15, 23, 42));
-        startBtn.setPreferredSize(new Dimension(280, 44));
-        startBtn.addActionListener(e -> handleStartAuction());
-        container.add(startBtn, gbc);
+        startBtn.setPreferredSize(new Dimension(260, 44));
+        startBtn.setToolTipText("Continue from where the auction stopped (keeps sold players & remaining purses)");
+        startBtn.addActionListener(e -> handleStartAuction(false));
+
+        JButton resetBtn = new JButton("[RESET]  RESET TO INITIAL STATE");
+        resetBtn.setFont(Main.displayFont(Font.BOLD, 16));
+        resetBtn.setBackground(new Color(180, 83, 9));
+        resetBtn.setForeground(Color.WHITE);
+        resetBtn.setPreferredSize(new Dimension(240, 44));
+        resetBtn.setToolTipText("Reset all teams back to 100 Cr, clear squads, and restart from Player #1");
+        resetBtn.addActionListener(e -> handleStartAuction(true));
+
+        actionBtnRow.add(startBtn);
+        actionBtnRow.add(resetBtn);
+        container.add(actionBtnRow, gbc);
 
         JPanel wrapper = new JPanel(new GridBagLayout());
         wrapper.setOpaque(false);
@@ -314,6 +329,10 @@ public class SetupPanel extends JPanel {
     }
 
     private void handleStartAuction() {
+        handleStartAuction(false);
+    }
+
+    private void handleStartAuction(boolean resetAllToInitial) {
         Set<Integer> humanTeamIds = new HashSet<>();
         for (int i = 0; i < humanTeamCheckBoxes.size() && i < loadedTeams.size(); i++) {
             if (humanTeamCheckBoxes.get(i).isSelected()) {
@@ -340,15 +359,23 @@ public class SetupPanel extends JPanel {
         boolean isQuickMode = quickModeRadio.isSelected();
 
         try {
-            teamService.resetAllTeams(startingPurse, humanTeamIds);
-            new com.cricbid.dao.impl.PlayerDAOImpl().resetAllStatus();
             auctionService.setBotsEnabled(false);
+
+            if (resetAllToInitial) {
+                auctionService.resetAuctionToInitialState(startingPurse, humanTeamIds, timerDuration, isQuickMode);
+            } else {
+                // Keep existing purses & sold squads, just mark selected franchises as HUMAN and continue!
+                com.cricbid.dao.TeamDAO teamDAO = new com.cricbid.dao.impl.TeamDAOImpl();
+                for (Team t : loadedTeams) {
+                    teamDAO.updateOwnerType(t.getTeamId(),
+                            humanTeamIds.contains(t.getTeamId()) ? OwnerType.HUMAN : OwnerType.BOT);
+                }
+                auctionService.continueOrStartAuction(timerDuration, isQuickMode);
+            }
 
             if (onAuctionStarted != null) {
                 onAuctionStarted.accept(isQuickMode);
             }
-
-            auctionService.startAuction(timerDuration, isQuickMode);
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this, "Failed to initialize auction: " + ex.getMessage(),
                     "Database Error", JOptionPane.ERROR_MESSAGE);

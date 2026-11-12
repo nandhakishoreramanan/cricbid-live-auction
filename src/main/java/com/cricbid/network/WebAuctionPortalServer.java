@@ -508,16 +508,17 @@ public class WebAuctionPortalServer implements AuctionObserver {
             try {
                 switch (cmd) {
                     case "start":
-                        if (!auctionService.isRunning()) {
-                            PlayerDAO playerDAO = new PlayerDAOImpl();
-                            playerDAO.resetAllStatus();
-                            java.util.Set<Integer> humanIds = new java.util.HashSet<>(java.util.Arrays.asList(1, 2, 3, 4, 5, 6));
-                            teamService.resetAllTeams(100.0, humanIds);
-                            auctionService.setBotsEnabled(false);
-                            auctionService.startAuction(15, true);
-                        } else if (auctionService.isPaused()) {
-                            auctionService.resumeAuction();
+                    case "resume":
+                        auctionService.setBotsEnabled(false);
+                        auctionService.continueOrStartAuction(15, true);
+                        break;
+                    case "reset":
+                        java.util.Set<Integer> humanIds = new java.util.HashSet<>(java.util.Arrays.asList(1, 2, 3, 4, 5, 6));
+                        auctionService.resetAuctionToInitialState(100.0, humanIds, 15, true);
+                        if (auctionServer != null) {
+                            auctionServer.broadcastAuctionReset(true);
                         }
+                        appendFeed("=== [RESET] AUCTION RESET TO INITIAL STATE (All Teams 100 Cr | Player #1) ===");
                         break;
                     case "pause":
                         if (auctionService.isPaused()) {
@@ -595,6 +596,9 @@ public class WebAuctionPortalServer implements AuctionObserver {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
         ex.getResponseHeaders().set("Cache-Control", "no-store");
+        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);
@@ -774,10 +778,11 @@ public class WebAuctionPortalServer implements AuctionObserver {
             + "              <button class='pass-btn' onclick='passRound()'>>> Pass Round</button>\n"
             + "            </div>\n"
             + "          </div>\n"
-            + "          <div id='adminControls' style='display:none;margin-top:12px;gap:8px;'>\n"
-            + "            <button class='place-btn' style='font-size:16px' onclick=\"adminCmd('start')\">>> Start / Resume Auction</button>\n"
-            + "            <button class='pass-btn' onclick=\"adminCmd('pause')\">|| Pause / Resume</button>\n"
+            + "          <div id='adminControls' style='display:none;margin-top:12px;gap:8px;flex-wrap:wrap;'>\n"
+            + "            <button class='place-btn' style='font-size:16px' onclick=\"adminCmd('start')\">>> Continue / Resume</button>\n"
+            + "            <button class='pass-btn' onclick=\"adminCmd('pause')\">|| Pause</button>\n"
             + "            <button class='pass-btn' style='background:#2563eb' onclick=\"adminCmd('next')\">>> Next Player</button>\n"
+            + "            <button class='pass-btn' style='background:#b45309' onclick=\"adminCmd('reset')\">[RESET] Initial State</button>\n"
             + "          </div>\n"
             + "        </div>\n"
             + "      </div>\n"

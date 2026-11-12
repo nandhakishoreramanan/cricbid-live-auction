@@ -515,22 +515,23 @@ function sendCustomChat(){
 
 async function adminAction(cmd){
   if (javaBackendBase) {
-    const mapped = (cmd === 'resume' || cmd === 'reset') ? 'start' : cmd;
-    try { await fetch(javaBackendBase + '/api/admin', {method:'POST', body:new URLSearchParams({cmd:mapped})}); await syncFromJavaServer(); return; } catch(e){}
+    try { await fetch(javaBackendBase + '/api/admin', {method:'POST', body:new URLSearchParams({cmd:cmd})}); await syncFromJavaServer(); return; } catch(e){}
   }
   let s = getState();
   if(cmd === 'reset'){
     s = defaultState();
+    s.feed.push('=== [RESET] AUCTION RESET TO INITIAL STATE (All Teams 100.00 Cr | Player #1) ===');
     saveState(s);
     renderState(true);
     return;
   }
   if(cmd === 'pause'){
     s.paused = !s.paused;
-    s.feed.push(s.paused ? '--- || AUCTION PAUSED ---' : '--- >> AUCTION RESUMED ---');
+    s.feed.push(s.paused ? '--- || AUCTION PAUSED (State Saved) ---' : '--- >> AUCTION CONTINUED FROM SAVED STATE ---');
   } else if(cmd === 'resume'){
     s.paused = false;
     s.running = true;
+    s.feed.push('--- >> AUCTION CONTINUED FROM SAVED STATE ---');
   } else if(cmd === 'next'){
     advancePlayer(s);
   }

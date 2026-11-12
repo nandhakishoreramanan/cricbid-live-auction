@@ -678,27 +678,56 @@ public class LiveAuctionPanel extends JPanel implements AuctionObserver {
         adminControlRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 4));
         adminControlRow.setOpaque(false);
 
-        adminPauseResumeBtn = new JButton("||  Pause / Resume Round");
+        adminPauseResumeBtn = new JButton("||  Pause / Resume");
         adminPauseResumeBtn.setFont(Main.uiFont(Font.BOLD, 12));
-        adminPauseResumeBtn.setBackground(new Color(30, 41, 59));
+        adminPauseResumeBtn.setBackground(new Color(22, 163, 74));
         adminPauseResumeBtn.setForeground(Color.WHITE);
-        adminPauseResumeBtn.setPreferredSize(new Dimension(190, 38));
+        adminPauseResumeBtn.setPreferredSize(new Dimension(150, 38));
         adminPauseResumeBtn.addActionListener(e -> {
-            if (auctionService.isPaused()) {
-                auctionService.resumeAuction();
-            } else {
-                auctionService.pauseAuction();
-            }
+            try {
+                if (!auctionService.isRunning()) {
+                    auctionService.continueOrStartAuction(15, true);
+                } else if (auctionService.isPaused()) {
+                    auctionService.resumeAuction();
+                } else {
+                    auctionService.pauseAuction();
+                }
+            } catch (SQLException ignored) {}
         });
         adminControlRow.add(adminPauseResumeBtn);
 
-        adminSkipBtn = new JButton(">>  Skip / Next Player");
+        adminSkipBtn = new JButton(">>  Next Player");
         adminSkipBtn.setFont(Main.uiFont(Font.BOLD, 12));
         adminSkipBtn.setBackground(new Color(37, 99, 235));
         adminSkipBtn.setForeground(Color.WHITE);
-        adminSkipBtn.setPreferredSize(new Dimension(175, 38));
+        adminSkipBtn.setPreferredSize(new Dimension(135, 38));
         adminSkipBtn.addActionListener(e -> auctionService.presentNextPlayer());
         adminControlRow.add(adminSkipBtn);
+
+        JButton adminResetBtn = new JButton("[RESET] Initial State");
+        adminResetBtn.setFont(Main.uiFont(Font.BOLD, 12));
+        adminResetBtn.setBackground(new Color(180, 83, 9));
+        adminResetBtn.setForeground(Color.WHITE);
+        adminResetBtn.setPreferredSize(new Dimension(155, 38));
+        adminResetBtn.setToolTipText("Reset all teams to 100 Cr, clear squads, and restart from Player #1");
+        adminResetBtn.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Reset all franchises to 100.00 Cr, clear all sold squads, and restart from Player #1?",
+                    "Confirm Full Reset to Initial State", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    java.util.Set<Integer> humanIds = new java.util.HashSet<>(java.util.Arrays.asList(1, 2, 3, 4, 5, 6));
+                    auctionService.resetAuctionToInitialState(100.0, humanIds, 15, true);
+                    if (auctionServer != null) {
+                        auctionServer.broadcastAuctionReset(true);
+                    }
+                    handleAuctionReset(true);
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this, "Reset failed: " + ex.getMessage());
+                }
+            }
+        });
+        adminControlRow.add(adminResetBtn);
         adminControlRow.setVisible(false);
 
         panel.add(adminControlRow, gbc);

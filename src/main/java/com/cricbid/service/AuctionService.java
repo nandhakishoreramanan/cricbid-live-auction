@@ -138,16 +138,70 @@ public class AuctionService {
             this.isPaused = false;
             this.isRunning = true;
 
-            
             this.auctionPool = playerDAO.findByStatus(PlayerStatus.AVAILABLE);
             if (quickMode && auctionPool.size() > 20) {
-                
                 this.auctionPool = new ArrayList<>(this.auctionPool.subList(0, 20));
             }
             this.currentPoolIndex = 0;
 
             startBotExecutor();
             presentNextPlayer();
+        } finally {
+            auctionLock.unlock();
+        }
+    }
+
+    /**
+     * Continues from the exact player and countdown state where the auction was paused/stopped,
+     * or resumes from the remaining AVAILABLE players in the database without wiping sold squads.
+     */
+    public void continueOrStartAuction(int durationSec, boolean quickMode) throws SQLException {
+        auctionLock.lock();
+        try {
+            this.roundDurationSec = Math.max(5, Math.min(30, durationSec));
+            this.quickMode = quickMode;
+            RuleValidator.setQuickModeActive(quickMode);
+
+            if (this.isRunning && this.currentPlayer != null) {
+                resumeAuction();
+                return;
+            }
+            List<Player> remaining = playerDAO.findByStatus(PlayerStatus.AVAILABLE);
+            if (remaining.isEmpty()) {
+                playerDAO.resetAllStatus();
+            }
+            startAuction(durationSec, quickMode);
+        } finally {
+            auctionLock.unlock();
+        }
+    }
+
+    /**
+     * Resets all players to AVAILABLE, clears all squads, resets all team purses to startingPurse,
+     * and restarts the auction from Player #1.
+     */
+    public void resetAuctionToInitialState(double startingPurse,
+                                           java.util.Set<Integer> humanTeamIds,
+                                           int durationSec,
+                                           boolean quickMode) throws SQLException {
+        auctionLock.lock();
+        try {
+            stopBotExecutor();
+            if (swingCountdownTimer != null) {
+                swingCountdownTimer.stop();
+            }
+            this.isRunning = false;
+            this.isPaused = false;
+            this.currentPlayer = null;
+            this.currentLeadingTeam = null;
+            this.currentHighestBid = null;
+            this.roundHasBids = false;
+
+            teamService.resetAllTeams(startingPurse, humanTeamIds);
+            playerDAO.resetAllStatus();
+            this.botsEnabled = false;
+
+            startAuction(durationSec, quickMode);
         } finally {
             auctionLock.unlock();
         }
