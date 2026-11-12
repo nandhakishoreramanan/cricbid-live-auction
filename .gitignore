@@ -1,0 +1,5 @@
+target/
+review1_backup/
+*.class
+.DS_Store
+dependency-reduced-pom.xml

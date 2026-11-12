@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RA2512704010011 Login Page</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+      --card-bg: rgba(30, 41, 59, 0.75);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: rgba(15, 23, 42, 0.6);
+      --input-border: rgba(148, 163, 184, 0.25);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      --success: #10b981;
+      --error: #ef4444;
+      --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    }
+
+    [data-theme="light"] {
+      --bg-gradient: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 50%, #fdf2f8 100%);
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(99, 102, 241, 0.15);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --input-bg: #ffffff;
+      --input-border: #cbd5e1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background glow orbs */
+    .glow-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+    .orb-1 { width: 340px; height: 340px; background: #6366f1; top: -50px; left: -50px; }
+    .orb-2 { width: 380px; height: 380px; background: #ec4899; bottom: -80px; right: -80px; }
+
+    /* Theme Toggle */
+    .theme-toggle-btn {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 10px 16px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+
+    .theme-toggle-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .main-card {
+      position: relative;
+      z-index: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px 34px;
+      width: 100%;
+      max-width: 440px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow);
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .header-box {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: var(--primary-gradient);
+      color: #fff;
+      font-size: 26px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+    }
+
+    .header-box h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .header-box p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+
+    /* Input Fields */
+    .input-group {
+      margin-bottom: 18px;
+    }
+
+    .input-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      color: var(--text-muted);
+      font-size: 16px;
+      pointer-events: none;
+    }
+
+    .custom-input {
+      width: 100%;
+      padding: 12px 42px 12px 40px;
+      background: var(--input-bg);
+      border: 1.5px solid var(--input-border);
+      border-radius: 12px;
+      font-size: 14px;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .custom-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.18);
+    }
+
+    .toggle-pass-btn {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px;
+    }
+
+    .toggle-pass-btn:hover {
+      color: var(--text-main);
+    }
+
+    /* Password Strength Indicator */
+    .strength-bar-container {
+      margin-top: 6px;
+      display: none;
+    }
+
+    .strength-bar-track {
+      height: 4px;
+      background: rgba(148, 163, 184, 0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    .strength-bar-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s, background-color 0.3s;
+      border-radius: 2px;
+    }
+
+    .strength-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* Caps Lock Warning */
+    .caps-warn {
+      display: none;
+      font-size: 11px;
+      color: #f59e0b;
+      margin-top: 4px;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Submit Button */
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--primary-gradient);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 25px rgba(99, 102, 241, 0.45);
+    }
+
+    /* Alerts */
+    .alert-box {
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+      text-align: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .alert-box.error {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .alert-box.success {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    /* Dashboard view after login */
+    .user-profile-badge {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin: 18px 0;
+    }
+
+    .avatar-circle {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: var(--primary-gradient);
+      color: white;
+      font-size: 28px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+    }
+    .meta-row:last-child { border-bottom: none; }
+    .meta-row strong { color: var(--text-main); }
+
+    .users-dir {
+      margin-top: 14px;
+      padding: 12px;
+      background: rgba(0,0,0,0.15);
+      border-radius: 12px;
+      font-size: 12px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.06);
+    }
+
+    .btn-logout {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      border-radius: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 13.5px;
+      margin-top: 16px;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      background: #ef4444;
+      color: white;
+    }
+
+    .footer-action {
+      text-align: center;
+      margin-top: 22px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-action a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 700;
+      margin-left: 4px;
+    }
+
+    .footer-action a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Light Orbs -->
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+
+  <!-- Unique Feature 1: Dark / Light Mode Toggle -->
+  <button class="theme-toggle-btn" onclick="toggleTheme()" id="themeBtn">
+    <i class="bi bi-sun-fill" id="themeIcon"></i>
+    <span id="themeLabel">Light Mode</span>
+  </button>
+
+  <div class="main-card">
+
+    {% if success %}
+      <!-- Unique Feature 2: Rich Authenticated Dashboard -->
+      <div class="header-box">
+        <div class="logo-badge" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+          <i class="bi bi-shield-check"></i>
+        </div>
+        <h2 style="color: #10b981;">Logged in successfully</h2>
+        <p>Authentication verified via <code>UserAccount</code> Model &amp; if-condition</p>
+      </div>
+
+      <div class="user-profile-badge">
+        <div class="avatar-circle">
+          {{ username|slice:":1"|upper }}
+        </div>
+        <h3 style="font-weight: 700; margin-bottom: 4px;">{{ username }}</h3>
+        <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; background: var(--primary); color: white; padding: 3px 10px; border-radius: 20px;">
+          {{ role|default:"Student" }}
+        </span>
+
+        <div style="margin-top: 18px; text-align: left;">
+          <div class="meta-row">
+            <span>Status:</span>
+            <strong style="color: #10b981;">Active &bull; Authenticated</strong>
+          </div>
+          <div class="meta-row">
+            <span>Last Login:</span>
+            <strong>{{ last_login|date:"M d, Y - H:i:s" }}</strong>
+          </div>
+          <div class="meta-row">
+            <span>Total Accounts in DB:</span>
+            <strong>{{ total_users }} Users</strong>
+          </div>
+        </div>
+
+        {% if all_users %}
+        <div class="users-dir">
+          <div style="font-weight: 700; margin-bottom: 6px; color: var(--text-muted); text-align: left;">
+            <i class="bi bi-people-fill me-1"></i> Registered Users Directory:
+          </div>
+          {% for u in all_users %}
+            <div class="user-item">
+              <span>{{ u.username }}</span>
+              <span style="opacity: 0.7;">{{ u.role }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div>
+          <a href="{% url 'login' %}" class="btn-logout">
+            <i class="bi bi-box-arrow-right"></i> Log Out
+          </a>
+        </div>
+      </div>
+
+    {% else %}
+
+      <!-- Header -->
+      <div class="header-box">
+        <div class="logo-badge">
+          <i class="bi bi-fingerprint"></i>
+        </div>
+        <h2>RA2512704010011 Login</h2>
+        <p>Enter your credentials to continue</p>
+      </div>
+
+      <!-- Error alert -->
+      {% if error %}
+        <div class="alert-box error">
+          <i class="bi bi-exclamation-circle-fill me-1"></i> {{ error }}
+        </div>
+      {% endif %}
+
+      <form method="POST" action="">
+        {% csrf_token %}
+
+        <!-- Username Input -->
+        <div class="input-group">
+          <div class="input-label">
+            <label for="username">Username</label>
+          </div>
+          <div class="input-wrapper">
+            <i class="bi bi-person input-icon"></i>
+            <input type="text" id="username" name="username" class="custom-input"
+                   placeholder="Enter username" value="{{ typed_username|default:'' }}" required autofocus>
+          </div>
+        </div>
+
+        <!-- Password Input with Show/Hide & Strength Meter -->
+        <div class="input-group">
+          <div class="input-label">
+            <label for="password">Password</label>
+            <span class="caps-warn" id="capsWarn"><i class="bi bi-exclamation-triangle"></i> CAPS ON</span>
+          </div>
+          <div class="input-wrapper">
+            <i class="bi bi-lock input-icon"></i>
+            <input type="password" id="password" name="password" class="custom-input"
+                   placeholder="Enter password" required oninput="checkStrength(this.value)">
+            
+            <!-- Unique Feature 4: Show/Hide Password Eye Toggle -->
+            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility()" title="Show/Hide Password">
+              <i class="bi bi-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+
+          <!-- Unique Feature 5: Real-Time Password Strength Meter -->
+          <div class="strength-bar-container" id="strengthContainer">
+            <div class="strength-bar-track">
+              <div class="strength-bar-fill" id="strengthFill"></div>
+            </div>
+            <div class="strength-text" id="strengthText">Strength: Too short</div>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <i class="bi bi-box-arrow-in-right"></i> Login
+        </button>
+      </form>
+
+      <div class="footer-action" style="font-size: 12px; color: var(--text-muted); margin-top: 18px;">
+        <i class="bi bi-shield-lock text-primary me-1"></i> Student accounts are created and managed by Administrator
+      </div>
+
+    {% endif %}
+
+  </div>
+
+  <script>
+    // 1. Dark/Light Mode Switcher
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      html.setAttribute('data-theme', newTheme);
+      
+      const themeIcon = document.getElementById('themeIcon');
+      const themeLabel = document.getElementById('themeLabel');
+      if (newTheme === 'dark') {
+        themeIcon.className = 'bi bi-sun-fill';
+        themeLabel.textContent = 'Light Mode';
+      } else {
+        themeIcon.className = 'bi bi-moon-stars-fill';
+        themeLabel.textContent = 'Dark Mode';
+      }
+      localStorage.setItem('theme', newTheme);
+    }
+
+    // Load saved theme preference
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const themeIcon = document.getElementById('themeIcon');
+    const themeLabel = document.getElementById('themeLabel');
+    if (savedTheme === 'light' && themeIcon && themeLabel) {
+      themeIcon.className = 'bi bi-moon-stars-fill';
+      themeLabel.textContent = 'Dark Mode';
+    }
+
+    // 2. Show/Hide Password Toggle
+    function togglePasswordVisibility() {
+      const pField = document.getElementById('password');
+      const eyeIcon = document.getElementById('eyeIcon');
+      if (pField.type === 'password') {
+        pField.type = 'text';
+        eyeIcon.className = 'bi bi-eye-slash';
+      } else {
+        pField.type = 'password';
+        eyeIcon.className = 'bi bi-eye';
+      }
+    }
+
+    // 4. Real-Time Password Strength Meter
+    function checkStrength(pwd) {
+      const container = document.getElementById('strengthContainer');
+      const fill = document.getElementById('strengthFill');
+      const text = document.getElementById('strengthText');
+      if (!container || !fill || !text) return;
+
+      if (!pwd) {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'block';
+
+      let score = 0;
+      if (pwd.length >= 6) score++;
+      if (pwd.length >= 10) score++;
+      if (/[0-9]/.test(pwd)) score++;
+      if (/[A-Z]/.test(pwd)) score++;
+      if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+      if (score <= 1) {
+        fill.style.width = '25%';
+        fill.style.backgroundColor = '#ef4444';
+        text.textContent = 'Strength: Weak';
+        text.style.color = '#ef4444';
+      } else if (score <= 3) {
+        fill.style.width = '65%';
+        fill.style.backgroundColor = '#f59e0b';
+        text.textContent = 'Strength: Medium';
+        text.style.color = '#f59e0b';
+      } else {
+        fill.style.width = '100%';
+        fill.style.backgroundColor = '#10b981';
+        text.textContent = 'Strength: Strong 🛡️';
+        text.style.color = '#10b981';
+      }
+    }
+
+    // 5. Caps Lock Detector
+    const pField = document.getElementById('password');
+    const capsWarn = document.getElementById('capsWarn');
+    if (pField && capsWarn) {
+      pField.addEventListener('keyup', (e) => {
+        if (e.getModifierState && e.getModifierState('CapsLock')) {
+          capsWarn.style.display = 'inline-flex';
+        } else {
+          capsWarn.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

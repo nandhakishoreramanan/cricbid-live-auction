@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CricBid: Live Cricket Player Auction System — 24/7 Cloud Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Poppins:wght@500;600;700&family=Rajdhani:wght@700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Poppins',sans-serif;background:#0b132b url('bg.png') center/cover fixed no-repeat;color:#f1f5f9;min-height:100vh;}
+.overlay{background:rgba(9,15,34,0.82);min-height:100vh;display:flex;flex-direction:column;}
+.topbar{background:#0f172a;border-bottom:2px solid #f59e0b;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.brand{font-family:'Rajdhani',sans-serif;font-size:24px;color:#fbbf24;letter-spacing:1px;}
+.nav-pills{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.nav-btn{background:#1e293b;border:1px solid #334155;color:#fff;padding:6px 12px;border-radius:6px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;}
+.nav-btn.active{background:#f59e0b;color:#0f172a;border-color:#f59e0b;}
+.status-pill{background:#14532d;color:#fff;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;}
+#loginView{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-card{background:rgba(14,24,48,0.92);border:2px solid #f59e0b;border-radius:14px;max-width:540px;width:100%;padding:28px 32px;box-shadow:0 20px 50px rgba(0,0,0,0.65);}
+.login-card h1{font-family:'Rajdhani',sans-serif;font-size:34px;text-align:center;color:#fff;margin-bottom:4px;letter-spacing:1px;}
+.login-card .sub{text-align:center;color:#fbbf24;font-size:12px;margin-bottom:16px;font-weight:600;}
+.lan-banner{background:#0b132b;border:1px solid #38bdf8;color:#38bdf8;padding:8px 12px;border-radius:6px;font-size:11px;text-align:center;margin-bottom:16px;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:12px;color:#cbd5e1;margin-bottom:5px;font-weight:600;}
+.field input{width:100%;padding:10px 12px;background:#1e293b;border:1px solid #475569;color:#fff;border-radius:6px;font-family:'Poppins',sans-serif;font-size:13px;}
+.quick-box{background:#0b132b;border:1px solid #334155;border-radius:8px;padding:10px;margin:12px 0;}
+.quick-title{font-size:11px;color:#fbbf24;margin-bottom:6px;font-weight:600;}
+.quick-row{display:flex;gap:6px;flex-wrap:wrap;}
+.qbtn{flex:1;padding:7px 8px;border:none;border-radius:6px;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;color:#fff;min-width:110px;}
+.btn-gold{width:100%;padding:12px;background:#f59e0b;color:#0f172a;border:none;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;cursor:pointer;margin-top:8px;}
+.btn-gold:hover{background:#fbbf24;}
+#arenaView,#teamsView,#analyticsView{display:none;flex-direction:column;gap:10px;padding:12px 16px;max-width:1400px;width:100%;margin:0 auto;}
+.host-bar{background:#14532d;color:#fff;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;}
+.tcard{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px 10px;}
+.tcard.lead{background:#1e3a8a;border:2px solid #fbbf24;}
+.tcard.you{border-color:#38bdf8;}
+.tcard .tname{font-size:13px;font-weight:700;color:#fff;}
+.tcard.lead .tname{color:#fbbf24;}
+.tcard .tpurse{font-size:11px;color:#94a3b8;margin-top:2px;}
+.grid{display:grid;grid-template-columns:1.15fr 0.85fr;gap:14px;}
+@media(max-width:920px){.grid{grid-template-columns:1fr;}}
+.pcard{background:linear-gradient(135deg,#0f172a,#1e3a8a);border:2px solid #f59e0b;border-radius:12px;padding:16px;display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;}
+.badges{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.b-role{background:#f59e0b;color:#0f172a;padding:3px 9px;border-radius:4px;font-size:11px;font-weight:700;}
+.b-os{background:#1e293b;color:#38bdf8;padding:3px 9px;border-radius:4px;font-size:11px;font-weight:700;}
+.b-base{color:#fbbf24;font-size:12px;font-weight:700;}
+.pname{font-family:'Rajdhani',sans-serif;font-size:34px;color:#fff;line-height:1.1;}
+.psummary{font-size:12px;color:#cbd5e1;margin:6px 0 12px 0;}
+.sbar{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;}
+.sbar-lbl{width:120px;color:#94a3b8;font-weight:600;}
+.sbar-track{flex:1;height:10px;background:#1e293b;border-radius:6px;overflow:hidden;min-width:90px;}
+.sbar-fill1{height:100%;background:linear-gradient(90deg,#38bdf8,#22c55e);transition:width 0.3s;}
+.sbar-fill2{height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);transition:width 0.3s;}
+.sbar-fill3{height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);transition:width 0.3s;}
+.sbar-val{width:135px;font-weight:700;color:#38bdf8;}
+.timer-ring{width:98px;height:98px;border-radius:50%;border:7px solid #22c55e;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;background:rgba(15,23,42,0.75);}
+.timer-ring .sec{font-family:'Rajdhani',sans-serif;font-size:28px;color:#fff;line-height:1;}
+.timer-ring .lbl{font-size:9px;color:#94a3b8;margin-top:2px;}
+.clock-bar-wrap{width:100%;display:flex;align-items:center;gap:8px;margin-top:6px;}
+.clock-track{flex:1;height:14px;background:#334155;border-radius:7px;overflow:hidden;position:relative;}
+.clock-fill{height:100%;background:#22c55e;transition:width 0.3s;}
+.bid-box{background:rgba(17,28,53,0.95);border:1px solid #334155;border-radius:10px;padding:16px;margin-top:12px;}
+.bid-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.cur-price{font-family:'Rajdhani',sans-serif;font-size:34px;color:#fbbf24;}
+.lead-team{font-size:15px;color:#38bdf8;font-weight:700;}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+.controls input{width:110px;padding:8px 10px;background:#0f172a;border:1px solid #475569;color:#fff;border-radius:6px;font-size:15px;font-weight:700;}
+.step-btn{padding:8px 11px;background:#1e293b;border:1px solid #38bdf8;color:#38bdf8;border-radius:6px;font-weight:700;cursor:pointer;}
+.action-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;}
+.place-btn{flex:2;padding:12px;background:#f59e0b;color:#0f172a;border:none;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;cursor:pointer;}
+.pass-btn{flex:1;padding:12px;background:#334155;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
+.panel-box{background:rgba(17,28,53,0.95);border:1px solid #334155;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.panel-title{color:#fbbf24;font-size:13px;font-weight:700;}
+#feedArea{background:#0a1020;border:1px solid #1e293b;border-radius:6px;padding:8px;height:185px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e2e8f0;white-space:pre-wrap;}
+.banter-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.banter-btn{background:#1e293b;border:1px solid #475569;color:#fbbf24;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;}
+.chat-row{display:flex;gap:6px;}
+.chat-row input{flex:1;padding:7px 10px;background:#0f172a;border:1px solid #475569;color:#fff;border-radius:6px;font-family:'Poppins',sans-serif;font-size:12px;}
+.chat-row button{padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#1e293b;color:#fbbf24;text-align:left;padding:7px 8px;position:sticky;top:0;}
+td{padding:6px 8px;border-bottom:1px solid #1e293b;color:#e2e8f0;}
+#soldModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center;padding:20px;}
+.modal-card{background:linear-gradient(135deg,#0f172a,#14532d);border:3px solid #fbbf24;border-radius:14px;max-width:440px;width:100%;padding:26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.8);}
+.modal-badge{display:inline-block;background:#fbbf24;color:#0f172a;padding:4px 14px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div class="topbar">
+    <div class="brand">* CRICBID LIVE AUCTION ARENA</div>
+    <div id="topNav" class="nav-pills" style="display:none;">
+      <button id="navLive" class="nav-btn active" onclick="switchTab('live')">* Live Arena</button>
+      <button id="navTeams" class="nav-btn" onclick="switchTab('teams')">Franchises & Squads</button>
+      <button id="navAnalytics" class="nav-btn" onclick="switchTab('analytics')">Analytics & Summary</button>
+      <button id="soundBtn" class="nav-btn" style="background:#166534" onclick="toggleSound()">Sound: ON</button>
+      <button class="nav-btn" style="background:#7f1d1d" onclick="location.reload()">Logout</button>
+    </div>
+    <div id="userBadge" class="status-pill">24/7 Cloud Broadcast Portal</div>
+  </div>
+
+  <!-- LOGIN VIEW -->
+  <div id="loginView">
+    <div class="login-card">
+      <div class="sub">* IPL BROADCAST EDITION | MULTI-LAPTOP LIVE AUCTION *</div>
+      <h1>CRICBID LIVE AUCTION ARENA</h1>
+      <div class="lan-banner">[CLOUD + LAN READY] Works 24/7 across Tabs/Laptops or synced with Java Host Server</div>
+      <div class="field">
+        <label>Java Host Server IP (Optional — leave 'cloud' for 24/7 Always-On Cloud Mode):</label>
+        <input id="hostInput" value="cloud">
+      </div>
+      <div class="field">
+        <label>Username:</label>
+        <input id="uInput" value="owner1">
+      </div>
+      <div class="field">
+        <label>Password:</label>
+        <input id="pInput" type="password" value="owner123">
+      </div>
+      <div class="quick-box">
+        <div class="quick-title">Quick Role Fill (Open Multiple Tabs or Laptops to Bid Together!):</div>
+        <div class="quick-row">
+          <button class="qbtn" style="background:#334155" onclick="fillRole('admin','admin123')">Laptop 1: Admin (Host)</button>
+          <button class="qbtn" style="background:#2563eb" onclick="fillRole('owner1','owner123')">Laptop 2: owner1 (Hawks)</button>
+          <button class="qbtn" style="background:#16a34a" onclick="fillRole('owner2','owner123')">Laptop 3: owner2 (Wolves)</button>
+        </div>
+      </div>
+      <div id="loginErr" style="color:#f87171;font-size:12px;margin-bottom:6px;"></div>
+      <button class="btn-gold" onclick="doLogin()">&gt;&gt; CONNECT &amp; ENTER AUCTION ARENA &lt;&lt;</button>
+      <div style="text-align:center;color:#94a3b8;font-size:11px;margin-top:10px;">
+        Accounts: admin / admin123 (Host) &nbsp;|&nbsp; owner1 / owner123 (Thunder Hawks) &nbsp;|&nbsp; owner2 / owner123 (Iron Wolves)
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE ARENA VIEW -->
+  <div id="arenaView">
+    <div class="host-bar">
+      <span id="bannerText">* [LIVE] Connected to CricBid Broadcast Arena</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="nav-btn" style="background:#16a34a;padding:4px 10px;" onclick="adminAction('resume')">&gt;&gt; Start / Resume</button>
+        <button class="nav-btn" style="background:#475569;padding:4px 10px;" onclick="adminAction('pause')">|| Pause</button>
+        <button class="nav-btn" style="background:#2563eb;padding:4px 10px;" onclick="adminAction('next')">&gt;&gt; Next Player</button>
+        <button class="nav-btn" style="background:#b45309;padding:4px 10px;" onclick="adminAction('reset')">Reset Auction</button>
+      </div>
+    </div>
+    <div id="teamStrip" class="strip"></div>
+    <div class="grid">
+      <div>
+        <div class="pcard">
+          <div style="flex:1;min-width:260px;">
+            <div class="badges">
+              <span id="pRole" class="b-role">BATSMAN</span>
+              <span id="pOs" class="b-os">OVERSEAS</span>
+              <span id="pBase" class="b-base">Base Price: 2.00 Cr</span>
+            </div>
+            <div id="pName" class="pname">Liam Thorne</div>
+            <div id="pSummary" class="psummary">Batting Stats | Strike Rate: 154.20 | Run Rate: 9.25 RPO | Bat Avg: 48.60</div>
+            <div class="sbar"><span id="r1Lbl" class="sbar-lbl">STRIKE RATE:</span><div class="sbar-track"><div id="r1Fill" class="sbar-fill1" style="width:83%"></div></div><span id="r1Val" class="sbar-val">154.20 SR</span></div>
+            <div class="sbar"><span id="r2Lbl" class="sbar-lbl">RUN RATE / AVG:</span><div class="sbar-track"><div id="r2Fill" class="sbar-fill2" style="width:84%"></div></div><span id="r2Val" class="sbar-val" style="color:#fbbf24">9.25 RPO (Avg 48.6)</span></div>
+            <div class="sbar"><span class="sbar-lbl">OVR RATING:</span><div class="sbar-track"><div id="r3Fill" class="sbar-fill3" style="width:93%"></div></div><span id="r3Val" class="sbar-val" style="color:#fff">93 / 100</span></div>
+          </div>
+          <div id="timerRing" class="timer-ring"><div id="tSec" class="sec">15s</div><div class="lbl">TIMER</div></div>
+          <div class="clock-bar-wrap">
+            <span style="font-size:11px;color:#94a3b8;font-weight:600;">Round Clock:</span>
+            <div class="clock-track"><div id="clockFill" class="clock-fill" style="width:100%"></div></div>
+          </div>
+        </div>
+
+        <div class="bid-box">
+          <div class="bid-row"><span style="color:#94a3b8;font-size:12px;font-weight:700">CURRENT HIGHEST BID:</span><span id="curPrice" class="cur-price">2.00 Cr</span></div>
+          <div class="bid-row"><span style="color:#94a3b8;font-size:12px;font-weight:700">LEADING FRANCHISE:</span><span id="leadTeam" class="lead-team">None (Awaiting Opening Bid)</span></div>
+          <div class="bid-row"><span id="purseTitle" style="color:#cbd5e1;font-size:12px;font-weight:600">Your Purse:</span><span id="yourPurse" style="color:#4ade80;font-size:14px;font-weight:700">100.00 Cr (Squad: 0 / 25)</span></div>
+          <div id="bidderControls">
+            <div class="controls">
+              <span style="font-size:12px;color:#cbd5e1;font-weight:600;">Your Bid Amount (Cr):</span>
+              <input id="bidInput" type="number" step="0.25" value="2.00">
+              <button class="step-btn" onclick="addInc(0.25)">+0.25</button>
+              <button class="step-btn" onclick="addInc(0.50)">+0.50</button>
+              <button class="step-btn" onclick="addInc(1.00)">+1.00</button>
+            </div>
+            <div id="bidErr" style="color:#f87171;font-size:12px;margin-top:6px;"></div>
+            <div class="action-row">
+              <button class="place-btn" onclick="placeBid()">&gt;&gt; PLACE BID NOW</button>
+              <button class="pass-btn" onclick="passRound()">&gt;&gt; Pass Round</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="panel-box">
+          <div class="panel-title">[LIVE] Live Bidding Feed &amp; Multi-Laptop Chat</div>
+          <div id="feedArea"></div>
+          <div class="banter-row">
+            <span style="font-size:11px;color:#94a3b8;font-weight:600;">Quick Banter:</span>
+            <button class="banter-btn" onclick="sendChat('Steal!')">Steal!</button>
+            <button class="banter-btn" onclick="sendChat('Too Pricey!')">Too Pricey!</button>
+            <button class="banter-btn" onclick="sendChat('All In!')">All In!</button>
+            <button class="banter-btn" onclick="sendChat('Great Buy!')">Great Buy!</button>
+          </div>
+          <div class="chat-row">
+            <input id="chatInput" placeholder="Type a message to broadcast to all connected laptops..." onkeydown="if(event.key==='Enter')sendCustomChat()">
+            <button onclick="sendCustomChat()">Send Chat</button>
+          </div>
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-title">&gt;&gt; Upcoming Player Pool Queue</div>
+          <div style="max-height:220px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Key Stats (SR / RPO / Econ)</th><th>Rating</th><th>Base (Cr)</th><th>Status</th></tr></thead>
+              <tbody id="poolBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FRANCHISES & SQUADS VIEW -->
+  <div id="teamsView">
+    <div class="panel-box">
+      <div class="panel-title" style="font-size:18px;">* FRANCHISE SQUAD ROSTERS &amp; REMAINING PURSE</div>
+      <div id="teamsDetailGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS & SUMMARY VIEW -->
+  <div id="analyticsView">
+    <div class="panel-box">
+      <div class="panel-title" style="font-size:18px;">* AUCTION ANALYTICS, SPENDING BREAKDOWN &amp;SOLD PLAYERS</div>
+      <div id="analyticsContent" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- SOLD POPUP MODAL -->
+  <div id="soldModal" onclick="this.style.display='none'">
+    <div class="modal-card">
+      <div id="mBadge" class="modal-badge">HAMMER DOWN - SOLD!</div>
+      <h2 id="mPlayer" style="font-family:'Rajdhani',sans-serif;font-size:32px;color:#fff;margin-bottom:6px;">Liam Thorne</h2>
+      <div id="mTeam" style="color:#4ade80;font-size:18px;font-weight:700;margin-bottom:8px;">Acquired by Thunder Hawks</div>
+      <div id="mPrice" style="font-family:'Rajdhani',sans-serif;font-size:30px;color:#fbbf24;margin-bottom:14px;">Final Price: 5.25 Cr</div>
+      <button class="btn-gold" onclick="document.getElementById('soldModal').style.display='none'">Continue Auction</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 48 Seeded Players from CricBid seed.sql
+const SEED_PLAYERS = [
+  {id:1,name:"Liam Thorne",role:"BATSMAN",os:true,base:2.00,rating:93,avg:48.60,sr:154.20,econ:0,wkts:0,dism:0},
+  {id:2,name:"Zachary Vance",role:"BATSMAN",os:true,base:1.50,rating:89,avg:44.10,sr:148.50,econ:0,wkts:0,dism:0},
+  {id:3,name:"Aaryan Mehta",role:"BATSMAN",os:false,base:2.00,rating:94,avg:51.30,sr:142.80,econ:0,wkts:0,dism:0},
+  {id:15,name:"Tariq Aziz",role:"BOWLER",os:true,base:2.00,rating:95,avg:11.20,sr:88.00,econ:6.45,wkts:142,dism:0},
+  {id:31,name:"Kyle Donovan",role:"ALLROUNDER",os:true,base:2.00,rating:96,avg:37.80,sr:152.40,econ:7.30,wkts:110,dism:0},
+  {id:41,name:"Jesse Morgan",role:"WICKETKEEPER",os:true,base:2.00,rating:94,avg:46.50,sr:149.20,econ:0,wkts:0,dism:88},
+  {id:18,name:"Kabir Verma",role:"BOWLER",os:false,base:2.00,rating:92,avg:12.50,sr:95.00,econ:6.70,wkts:130,dism:0},
+  {id:33,name:"Aarav Kapoor",role:"ALLROUNDER",os:false,base:2.00,rating:93,avg:38.50,sr:140.50,econ:7.15,wkts:104,dism:0},
+  {id:42,name:"Rohan Joshi",role:"WICKETKEEPER",os:false,base:2.00,rating:92,avg:43.80,sr:141.50,econ:0,wkts:0,dism:82},
+  {id:16,name:"Dale Morrison",role:"BOWLER",os:true,base:1.50,rating:90,avg:9.80,sr:75.00,econ:6.85,wkts:118,dism:0},
+  {id:32,name:"Cameron Vance",role:"ALLROUNDER",os:true,base:1.50,rating:91,avg:34.20,sr:144.00,econ:7.60,wkts:92,dism:0},
+  {id:5,name:"Ryan Sterling",role:"BATSMAN",os:false,base:1.50,rating:88,avg:43.50,sr:141.00,econ:0,wkts:0,dism:0},
+  {id:21,name:"Ethan Hayes",role:"BOWLER",os:false,base:1.50,rating:88,avg:14.00,sr:102.00,econ:7.05,wkts:105,dism:0},
+  {id:35,name:"Dominic Drake",role:"ALLROUNDER",os:false,base:1.50,rating:89,avg:35.40,sr:142.20,econ:7.45,wkts:88,dism:0},
+  {id:43,name:"Lucas Drake",role:"WICKETKEEPER",os:true,base:1.50,rating:88,avg:39.20,sr:138.00,econ:0,wkts:0,dism:68},
+  {id:4,name:"Declan Frost",role:"BATSMAN",os:true,base:1.00,rating:85,avg:39.40,sr:138.60,econ:0,wkts:0,dism:0},
+  {id:7,name:"Kavi Sen",role:"BATSMAN",os:false,base:1.00,rating:84,avg:40.80,sr:136.20,econ:0,wkts:0,dism:0},
+  {id:10,name:"Julian Ray",role:"BATSMAN",os:true,base:1.00,rating:86,avg:41.20,sr:146.00,econ:0,wkts:0,dism:0},
+  {id:17,name:"Jett Harrison",role:"BOWLER",os:true,base:1.00,rating:87,avg:8.40,sr:72.00,econ:7.10,wkts:98,dism:0},
+  {id:27,name:"Ashwin Rao",role:"BOWLER",os:false,base:1.00,rating:85,avg:13.00,sr:92.00,econ:6.95,wkts:94,dism:0}
+];
+
+const ACCOUNTS = {
+  admin:  {role:"ADMIN", isAdmin:true, teamId:0, teamName:"Auctioneer Host"},
+  owner1: {role:"TEAM_OWNER", isAdmin:false, teamId:1, teamName:"Thunder Hawks"},
+  owner2: {role:"TEAM_OWNER", isAdmin:false, teamId:2, teamName:"Iron Wolves"},
+  owner3: {role:"TEAM_OWNER", isAdmin:false, teamId:3, teamName:"Royal Titans"},
+  owner4: {role:"TEAM_OWNER", isAdmin:false, teamId:4, teamName:"Storm Riders"},
+  owner5: {role:"TEAM_OWNER", isAdmin:false, teamId:5, teamName:"Neon Vipers"},
+  owner6: {role:"TEAM_OWNER", isAdmin:false, teamId:6, teamName:"Desert Falcons"}
+};
+
+let session = null;
+let soundEnabled = true;
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('cricbid_live_channel') : null;
+
+function playTone(freq, durMs, type='sine') {
+  if(!soundEnabled) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durMs/1000);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + durMs/1000);
+  } catch(e){}
+}
+
+function defaultState() {
+  return {
+    poolIdx: 0,
+    running: true,
+    paused: false,
+    seconds: 15,
+    maxSeconds: 15,
+    currentPrice: SEED_PLAYERS[0].base,
+    leadingTeamId: 0,
+    leadingTeamName: "None (Awaiting Opening Bid)",
+    roundHasBids: false,
+    teams: [
+      {id:1, name:"Thunder Hawks", purse:100.00, squad:[]},
+      {id:2, name:"Iron Wolves", purse:100.00, squad:[]},
+      {id:3, name:"Royal Titans", purse:100.00, squad:[]},
+      {id:4, name:"Storm Riders", purse:100.00, squad:[]},
+      {id:5, name:"Neon Vipers", purse:100.00, squad:[]},
+      {id:6, name:"Desert Falcons", purse:100.00, squad:[]}
+    ],
+    statuses: {},
+    feed: [
+      "=== NEW AUCTION STARTED (Quick Mode | 20 Marquee Players) ===",
+      ">>> * ON THE BLOCK: Liam Thorne (BATSMAN) | Base: 2.00 Cr"
+    ],
+    lastModal: null
+  };
+}
+
+function getState() {
+  try {
+    const raw = localStorage.getItem('cricbid_cloud_state_v1');
+    if(raw) return JSON.parse(raw);
+  } catch(e){}
+  const s = defaultState();
+  saveState(s);
+  return s;
+}
+
+function saveState(s) {
+  localStorage.setItem('cricbid_cloud_state_v1', JSON.stringify(s));
+  if(bc) bc.postMessage({type:'SYNC'});
+}
+
+if(bc) bc.onmessage = () => renderState();
+window.addEventListener('storage', () => renderState());
+
+function fillRole(u,p){
+  document.getElementById('uInput').value = u;
+  document.getElementById('pInput').value = p;
+}
+
+function doLogin(){
+  const u = document.getElementById('uInput').value.trim().toLowerCase();
+  const acct = ACCOUNTS[u];
+  if(!acct){
+    document.getElementById('loginErr').textContent = "Invalid username. Try admin, owner1, owner2, owner3...";
+    return;
+  }
+  session = {username: u, ...acct};
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('topNav').style.display = 'flex';
+  document.getElementById('arenaView').style.display = 'flex';
+  document.getElementById('userBadge').textContent = session.isAdmin
+    ? '* AUCTIONEER HOST (admin)'
+    : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')';
+  document.getElementById('bannerText').textContent = session.isAdmin
+    ? '* AUCTIONEER HOST CONSOLE | Controlling Live Broadcast Arena'
+    : '* [LIVE] Connected to Broadcast Arena | Bidding Live as Franchise: ' + session.teamName;
+  renderState(true);
+}
+
+function switchTab(tab){
+  document.getElementById('arenaView').style.display = tab==='live' ? 'flex' : 'none';
+  document.getElementById('teamsView').style.display = tab==='teams' ? 'flex' : 'none';
+  document.getElementById('analyticsView').style.display = tab==='analytics' ? 'flex' : 'none';
+  document.getElementById('navLive').className = 'nav-btn' + (tab==='live'?' active':'');
+  document.getElementById('navTeams').className = 'nav-btn' + (tab==='teams'?' active':'');
+  document.getElementById('navAnalytics').className = 'nav-btn' + (tab==='analytics'?' active':'');
+  renderState();
+}
+
+function toggleSound(){
+  soundEnabled = !soundEnabled;
+  const b = document.getElementById('soundBtn');
+  b.textContent = soundEnabled ? 'Sound: ON' : 'Sound: OFF';
+  b.style.background = soundEnabled ? '#166534' : '#475569';
+}
+
+function nextIncrement(price, hasBids){
+  if(!hasBids) return price;
+  if(price < 2.0) return +(price + 0.20).toFixed(2);
+  if(price < 5.0) return +(price + 0.25).toFixed(2);
+  return +(price + 0.50).toFixed(2);
+}
+
+function addInc(inc){
+  const inp = document.getElementById('bidInput');
+  inp.value = (parseFloat(inp.value || 0) + inc).toFixed(2);
+}
+
+function placeBid(){
+  const errEl = document.getElementById('bidErr');
+  errEl.textContent = '';
+  const s = getState();
+  if(!s.running || s.paused){ errEl.textContent = 'Auction is currently paused.'; return; }
+  const p = SEED_PLAYERS[s.poolIdx];
+  if(!p) return;
+
+  let teamId = session && !session.isAdmin ? session.teamId : 1;
+  const team = s.teams.find(t => t.id === teamId);
+  const amt = parseFloat(document.getElementById('bidInput').value);
+  const minValid = nextIncrement(s.currentPrice, s.roundHasBids);
+
+  if(isNaN(amt) || amt < minValid - 0.001){
+    errEl.textContent = 'Minimum valid bid is ' + minValid.toFixed(2) + ' Cr';
+    playTone(220, 200, 'sawtooth');
+    return;
+  }
+  if(s.leadingTeamId === team.id){
+    errEl.textContent = team.name + ' already holds the highest bid!';
+    return;
+  }
+  if(amt > team.purse){
+    errEl.textContent = 'Insufficient franchise purse!';
+    return;
+  }
+
+  s.currentPrice = +amt.toFixed(2);
+  s.leadingTeamId = team.id;
+  s.leadingTeamName = '* ' + team.name;
+  s.roundHasBids = true;
+  s.seconds = s.maxSeconds;
+  s.feed.push(`  >> [BID] ${team.name} bid ${s.currentPrice.toFixed(2)} Cr for ${p.name}`);
+  saveState(s);
+  playTone(880, 140, 'triangle');
+  renderState(true);
+}
+
+function passRound(){
+  const s = getState();
+  const who = session ? session.teamName : 'Franchise';
+  s.feed.push(`  >> [PASS] ${who} passed on the current player.`);
+  saveState(s);
+  renderState();
+}
+
+function sendChat(txt){
+  if(!txt) return;
+  const s = getState();
+  const who = session ? (session.isAdmin ? 'Auctioneer Host (admin)' : `${session.teamName} (${session.username})`) : 'Spectator';
+  s.feed.push(`  * [CHAT] ${who}: ${txt}`);
+  saveState(s);
+  renderState();
+}
+
+function sendCustomChat(){
+  const inp = document.getElementById('chatInput');
+  if(inp.value.trim()){
+    sendChat(inp.value.trim());
+    inp.value = '';
+  }
+}
+
+function adminAction(cmd){
+  let s = getState();
+  if(cmd === 'reset'){
+    s = defaultState();
+    saveState(s);
+    renderState(true);
+    return;
+  }
+  if(cmd === 'pause'){
+    s.paused = !s.paused;
+    s.feed.push(s.paused ? '--- || AUCTION PAUSED ---' : '--- >> AUCTION RESUMED ---');
+  } else if(cmd === 'resume'){
+    s.paused = false;
+    s.running = true;
+  } else if(cmd === 'next'){
+    advancePlayer(s);
+  }
+  saveState(s);
+  renderState(true);
+}
+
+function advancePlayer(s){
+  const cur = SEED_PLAYERS[s.poolIdx];
+  if(cur){
+    if(s.roundHasBids && s.leadingTeamId){
+      const winTeam = s.teams.find(t => t.id === s.leadingTeamId);
+      if(winTeam){
+        winTeam.purse = +(winTeam.purse - s.currentPrice).toFixed(2);
+        winTeam.squad.push({...cur, soldPrice: s.currentPrice});
+        s.statuses[cur.id] = 'SOLD';
+        s.feed.push(`>>> * SOLD: ${cur.name} acquired by ${winTeam.name} for ${s.currentPrice.toFixed(2)} Cr!`);
+        s.lastModal = {sold:true, player:cur.name, team:winTeam.name, price:s.currentPrice, ts:Date.now()};
+        playTone(523, 180, 'square'); setTimeout(()=>playTone(659, 260, 'square'), 180);
+      }
+    } else {
+      s.statuses[cur.id] = 'UNSOLD';
+      s.feed.push(`>>> [!] UNSOLD: ${cur.name} received no bids.`);
+      s.lastModal = {sold:false, player:cur.name, team:'No Bids Received', price:0, ts:Date.now()};
+    }
+  }
+  s.poolIdx++;
+  if(s.poolIdx >= SEED_PLAYERS.length){
+    s.running = false;
+    s.seconds = 0;
+    s.feed.push('=== AUCTION COMPLETED! Check Analytics & Final Summary ===');
+    return;
+  }
+  const nextP = SEED_PLAYERS[s.poolIdx];
+  s.currentPrice = nextP.base;
+  s.leadingTeamId = 0;
+  s.leadingTeamName = 'None (Awaiting Opening Bid)';
+  s.roundHasBids = false;
+  s.seconds = s.maxSeconds;
+  s.feed.push(`>>> * ON THE BLOCK: ${nextP.name} (${nextP.role}) | Base: ${nextP.base.toFixed(2)} Cr`);
+}
+
+// 1-second broadcast clock
+setInterval(() => {
+  if(!session) return;
+  const s = getState();
+  if(!s.running || s.paused) return;
+  s.seconds--;
+  if(s.seconds <= 3 && s.seconds > 0) playTone(640, 80, 'sine');
+  if(s.seconds <= 0){
+    advancePlayer(s);
+    saveState(s);
+    renderState(true);
+  } else {
+    saveState(s);
+    renderState(false);
+  }
+}, 1000);
+
+let lastShownModalTs = 0;
+let lastRenderedPlayerId = -1;
+let lastRenderedPrice = -1;
+
+function renderState(forceInputUpdate=false){
+  if(!session) return;
+  const s = getState();
+  const p = SEED_PLAYERS[s.poolIdx] || SEED_PLAYERS[SEED_PLAYERS.length-1];
+
+  // Team strip
+  document.getElementById('teamStrip').innerHTML = s.teams.map(t => {
+    const isLead = t.id === s.leadingTeamId;
+    const isYou = !session.isAdmin && t.id === session.teamId;
+    return `<div class="tcard ${isLead?'lead':''} ${isYou?'you':''}">
+      <div class="tname">${isLead?'* ':''}${t.name}${isYou?' [YOU]':' [LIVE]'}</div>
+      <div class="tpurse">${t.purse.toFixed(2)} Cr | ${t.squad.length}/25</div>
+    </div>`;
+  }).join('');
+
+  if(p){
+    const rpo = (p.sr * 6.0) / 100.0;
+    document.getElementById('pRole').textContent = p.role;
+    document.getElementById('pOs').textContent = p.os ? 'OVERSEAS' : 'DOMESTIC';
+    document.getElementById('pBase').textContent = `Base Price: ${p.base.toFixed(2)} Cr`;
+    document.getElementById('pName').textContent = s.running ? p.name : 'Auction Completed!';
+
+    let r1L, r1P, r1V, r2L, r2P, r2V, sum;
+    if(p.role === 'BOWLER'){
+      r1L = 'BOWL ECONOMY:'; r1P = Math.max(15, Math.min(100, ((11.5 - p.econ)/6.0)*100)); r1V = `${p.econ.toFixed(2)} RPO`;
+      r2L = 'CAREER WICKETS:'; r2P = Math.max(15, Math.min(100, (p.wkts/160.0)*100)); r2V = `${p.wkts} Wkts`;
+      sum = `Bowling Stats   |   Economy: ${p.econ.toFixed(2)} RPO   |   Career Wickets: ${p.wkts}   |   Rating: ${p.rating}/100`;
+    } else if(p.role === 'ALLROUNDER'){
+      r1L = 'STRIKE RATE:'; r1P = Math.max(15, Math.min(100, (p.sr/185.0)*100)); r1V = `${p.sr.toFixed(1)} (${rpo.toFixed(2)} RPO)`;
+      r2L = 'BOWL ECONOMY:'; r2P = Math.max(15, Math.min(100, ((11.5 - p.econ)/6.0)*100)); r2V = `${p.econ.toFixed(2)} RPO (${p.wkts}W)`;
+      sum = `All-Round Stats   |   SR: ${p.sr.toFixed(1)} (${rpo.toFixed(2)} RPO)   |   Economy: ${p.econ.toFixed(2)} RPO (${p.wkts} Wkts)`;
+    } else {
+      r1L = 'STRIKE RATE:'; r1P = Math.max(15, Math.min(100, (p.sr/185.0)*100)); r1V = `${p.sr.toFixed(2)} SR`;
+      r2L = 'RUN RATE / AVG:'; r2P = Math.max(15, Math.min(100, (p.avg/58.0)*100)); r2V = `${rpo.toFixed(2)} RPO (Avg ${p.avg.toFixed(1)})`;
+      sum = `Batting Stats   |   Strike Rate: ${p.sr.toFixed(2)}   |   Run Rate: ${rpo.toFixed(2)} RPO   |   Bat Avg: ${p.avg.toFixed(2)}`;
+    }
+    document.getElementById('pSummary').textContent = sum;
+    document.getElementById('r1Lbl').textContent = r1L; document.getElementById('r1Fill').style.width = r1P+'%'; document.getElementById('r1Val').textContent = r1V;
+    document.getElementById('r2Lbl').textContent = r2L; document.getElementById('r2Fill').style.width = r2P+'%'; document.getElementById('r2Val').textContent = r2V;
+    document.getElementById('r3Fill').style.width = p.rating+'%'; document.getElementById('r3Val').textContent = `${p.rating} / 100`;
+
+    if(forceInputUpdate || p.id !== lastRenderedPlayerId || s.currentPrice !== lastRenderedPrice){
+      lastRenderedPlayerId = p.id;
+      lastRenderedPrice = s.currentPrice;
+      document.getElementById('bidInput').value = nextIncrement(s.currentPrice, s.roundHasBids).toFixed(2);
+    }
+  }
+
+  // Timer
+  document.getElementById('tSec').textContent = s.paused ? 'PAUSE' : (s.seconds + 's');
+  const col = s.seconds <= 5 ? '#ef4444' : (s.seconds <= 10 ? '#f59e0b' : '#22c55e');
+  document.getElementById('timerRing').style.borderColor = col;
+  const cf = document.getElementById('clockFill');
+  cf.style.width = Math.max(0, (s.seconds / s.maxSeconds)*100) + '%';
+  cf.style.background = col;
+
+  // Bid info
+  document.getElementById('curPrice').textContent = s.currentPrice.toFixed(2) + ' Cr';
+  document.getElementById('leadTeam').textContent = s.leadingTeamName;
+  const myTeam = s.teams.find(t => t.id === (session.teamId || 1));
+  if(myTeam){
+    document.getElementById('purseTitle').textContent = `Your Purse (${myTeam.name}):`;
+    document.getElementById('yourPurse').textContent = `${myTeam.purse.toFixed(2)} Cr (Squad: ${myTeam.squad.length} / 25)`;
+  }
+
+  // Feed
+  const fa = document.getElementById('feedArea');
+  const fText = s.feed.slice(-45).join('\n');
+  if(fa.textContent !== fText){ fa.textContent = fText; fa.scrollTop = fa.scrollHeight; }
+
+  // Pool table
+  document.getElementById('poolBody').innerHTML = SEED_PLAYERS.slice(s.poolIdx).map(up => {
+    const rpo = (up.sr * 6.0) / 100.0;
+    const st = up.role==='BOWLER' ? `Econ ${up.econ.toFixed(2)} RPO | ${up.wkts} Wkts`
+             : (up.role==='ALLROUNDER' ? `SR ${up.sr.toFixed(1)} (${rpo.toFixed(1)} RPO) | Econ ${up.econ.toFixed(2)}`
+             : `SR ${up.sr.toFixed(1)} | ${rpo.toFixed(2)} RPO | Avg ${up.avg.toFixed(1)}`);
+    return `<tr>
+      <td>${up.id}</td>
+      <td><b>${up.name}${up.os?' (OS)':''}</b></td>
+      <td style="color:#38bdf8">${up.role}</td>
+      <td>${st}</td>
+      <td>${up.rating}</td>
+      <td style="color:#fbbf24">${up.base.toFixed(2)}</td>
+      <td style="color:#4ade80">AVAILABLE</td>
+    </tr>`;
+  }).join('');
+
+  // Sold modal
+  if(s.lastModal && Date.now() - s.lastModal.ts < 3500 && s.lastModal.ts !== lastShownModalTs){
+    lastShownModalTs = s.lastModal.ts;
+    document.getElementById('mBadge').textContent = s.lastModal.sold ? 'HAMMER DOWN - SOLD!' : 'ROUND EXPIRED - UNSOLD';
+    document.getElementById('mPlayer').textContent = s.lastModal.player;
+    document.getElementById('mTeam').textContent = s.lastModal.sold ? ('Acquired by ' + s.lastModal.team) : 'Received No Bids';
+    document.getElementById('mPrice').textContent = s.lastModal.sold ? (`Final Price: ${s.lastModal.price.toFixed(2)} Cr`) : 'Returned to Pool';
+    document.getElementById('soldModal').style.display = 'flex';
+  }
+
+  // Teams & Analytics tabs
+  document.getElementById('teamsDetailGrid').innerHTML = s.teams.map(t => {
+    const spent = (100 - t.purse).toFixed(2);
+    const rows = t.squad.length ? t.squad.map(sp => `<tr><td>${sp.name}</td><td>${sp.role}</td><td style="color:#fbbf24">${sp.soldPrice.toFixed(2)} Cr</td></tr>`).join('')
+                                : `<tr><td colspan="3" style="color:#64748b">No players acquired yet</td></tr>`;
+    return `<div class="tcard" style="padding:14px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <b style="color:#fbbf24;font-size:15px;">${t.name}</b>
+        <span style="color:#4ade80;font-size:12px;">Purse: ${t.purse.toFixed(2)} Cr (Spent: ${spent} Cr)</span>
+      </div>
+      <table><thead><tr><th>Player</th><th>Role</th><th>Sold Price</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+
+  const allSold = s.teams.flatMap(t => t.squad.map(sp => ({...sp, teamName:t.name})));
+  document.getElementById('analyticsContent').innerHTML = `
+    <p style="margin-bottom:10px;color:#cbd5e1;">Total Players Sold: <b style="color:#4ade80">${allSold.length}</b> &nbsp;|&nbsp; Total Purse Spent Across Franchises: <b style="color:#fbbf24">${allSold.reduce((a,b)=>a+b.soldPrice,0).toFixed(2)} Cr</b></p>
+    <table><thead><tr><th>Player</th><th>Role</th><th>Acquired By Franchise</th><th>Rating</th><th>Final Sold Price</th></tr></thead>
+    <tbody>${allSold.length ? allSold.map(x=>`<tr><td><b>${x.name}</b></td><td>${x.role}</td><td style="color:#38bdf8">${x.teamName}</td><td>${x.rating}</td><td style="color:#fbbf24;font-weight:700">${x.soldPrice.toFixed(2)} Cr</td></tr>`).join('') : '<tr><td colspan="5">Place bids in the Live Arena to see sold player analytics!</td></tr>'}</tbody></table>
+  `;
+}
+</script>
+</body>
+</html>

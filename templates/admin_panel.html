@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Student Marks & Activity</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --border: rgba(0, 0, 0, 0.08);
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #4f46e5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      padding: 16px 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .brand i { color: var(--primary); font-size: 22px; }
+
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: #ef4444; color: white; }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Stat Cards */
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+    }
+    .stat-card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .stat-card .val { font-size: 28px; font-weight: 800; color: var(--text); }
+
+    /* Main Content Layout */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
+
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Table */
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px; }
+    th { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    td { padding: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .badge-primary { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+
+    /* Inputs */
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13.5px;
+      margin-bottom: 12px;
+    }
+    .form-control:focus { border-color: var(--primary); outline: none; }
+
+    .alert { padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
+    .alert-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .alert-error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <i class="bi bi-shield-lock-fill"></i>
+      <span>Admin Control Panel</span>
+    </div>
+    <div class="nav-actions">
+      <span style="font-size: 13px; color: var(--muted);">
+        Signed in as <strong>admin</strong>
+      </span>
+      <a href="{% url 'logout' %}" class="btn btn-danger">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </div>
+  </header>
+
+  <main class="container">
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="alert {% if msg.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Stat Metric Cards -->
+    <section class="grid-stats">
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-people-fill me-1"></i> Total Enrolled Students</div>
+        <div class="val">{{ total_students }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-calculator me-1"></i> Class Average Marks</div>
+        <div class="val">{{ avg_marks }} <span style="font-size: 16px; color: var(--muted);">/ 100</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-trophy-fill text-warning me-1"></i> Highest Marks</div>
+        <div class="val">{{ highest_marks }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-clock-history me-1"></i> System Status</div>
+        <div class="val" style="font-size: 18px; color: #10b981;">Online &bull; Live</div>
+      </div>
+    </section>
+
+    <!-- Content Grid -->
+    <div class="content-grid">
+      
+      <!-- Student Marks & Login Details Table -->
+      <section class="panel-card">
+        <h2 class="panel-title">
+          <i class="bi bi-table text-primary"></i>
+          <span>Student Records &amp; Marks Management</span>
+        </h2>
+        
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Roll No</th>
+                <th>Marks / 100</th>
+                <th>Grade</th>
+                <th>Remarks</th>
+                <th>Last Login</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in students %}
+                <tr>
+                  <td>
+                    <strong>{{ s.username }}</strong>
+                  </td>
+                  <td><code style="color: var(--muted);">{{ s.roll_number|default:"-" }}</code></td>
+                  <td>
+                    <form method="POST" action="{% url 'update_marks' s.id %}" style="display: flex; align-items: center; gap: 6px;">
+                      {% csrf_token %}
+                      <input type="number" name="marks" value="{{ s.marks }}" min="0" max="100" class="form-control" style="width: 70px; margin-bottom: 0; padding: 6px;">
+                  </td>
+                  <td>
+                    <span class="badge badge-primary">{{ s.calculate_grade }}</span>
+                  </td>
+                  <td>
+                      <input type="text" name="remarks" value="{{ s.remarks }}" class="form-control" style="width: 140px; margin-bottom: 0; padding: 6px;">
+                  </td>
+                  <td>
+                    <small style="color: var(--muted);">
+                      {% if s.last_login %}
+                        {{ s.last_login|date:"M d, H:i" }}
+                      {% else %}
+                        Never
+                      {% endif %}
+                    </small>
+                  </td>
+                  <td>
+                      <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">
+                        Save
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--muted); padding: 30px;">
+                    No students found. Add your first student using the form on the right!
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Add New Student Form -->
+      <aside class="panel-card">
+        <h2 class="panel-title">
+          <i class="bi bi-person-plus-fill text-success"></i>
+          <span>Add Student &amp; Assign Marks</span>
+        </h2>
+
+        <form method="POST" action="">
+          {% csrf_token %}
+          <input type="hidden" name="add_student" value="1">
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Username</label>
+          <input type="text" name="username" class="form-control" placeholder="e.g. rahul_sharma" required>
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Temporary Password</label>
+          <input type="password" name="password" class="form-control" placeholder="e.g. Pass123" required>
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Roll Number</label>
+          <input type="text" name="roll_number" class="form-control" placeholder="e.g. RA2512704010011">
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Subject</label>
+          <input type="text" name="subject" class="form-control" value="Python & Django Web Dev">
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Marks (Out of 100)</label>
+          <input type="number" name="marks" class="form-control" placeholder="e.g. 85" min="0" max="100" value="75">
+
+          <label style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block;">Teacher's Remarks</label>
+          <input type="text" name="remarks" class="form-control" placeholder="e.g. Great work in lab practicals" value="Good performance">
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+            <i class="bi bi-hdd-fill"></i> Save Student Record
+          </button>
+        </form>
+      </aside>
+
+    </div>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,2993 @@
+Binary files review1_backup/src/main/java/com/.DS_Store and src/main/java/com/.DS_Store differ
+Binary files review1_backup/src/main/java/com/cricbid/.DS_Store and src/main/java/com/cricbid/.DS_Store differ
+diff -ruN review1_backup/src/main/java/com/cricbid/Main.java src/main/java/com/cricbid/Main.java
+--- review1_backup/src/main/java/com/cricbid/Main.java	2026-11-02 15:55:46
++++ src/main/java/com/cricbid/Main.java	2026-11-02 15:41:11
+@@ -1,9 +1,7 @@
+ package com.cricbid;
+ 
+-import com.cricbid.db.DBConnection;
+ import com.cricbid.ui.MainFrame;
+ 
+-import javax.swing.JOptionPane;
+ import javax.swing.SwingUtilities;
+ import javax.swing.UIManager;
+ 
+@@ -11,7 +9,6 @@
+ public class Main {
+ 
+     public static void main(String[] args) {
+-        
+         try {
+             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                 if ("Nimbus".equals(info.getName())) {
+@@ -25,26 +22,6 @@
+             } catch (Exception ignored) {}
+         }
+ 
+-        
+-        boolean dbConnected = DBConnection.getInstance().testConnection();
+-        if (!dbConnected) {
+-            String errorMsg = DBConnection.getInstance().getLastErrorMessage();
+-            String message = "Could not connect to MySQL Database 'cricbid'.\n\n" +
+-                    "Error Details: " + errorMsg + "\n\n" +
+-                    "Setup Checklist:\n" +
+-                    "1. Ensure MySQL 8+ server is running on localhost:3306.\n" +
+-                    "2. Run 'schema.sql' followed by 'seed.sql' to initialize tables and seed data.\n" +
+-                    "3. Verify credentials in 'db.properties' (db.user, db.password).\n\n" +
+-                    "Click OK to proceed with launching the application window.";
+-
+-            if (!java.awt.GraphicsEnvironment.isHeadless()) {
+-                JOptionPane.showMessageDialog(null, message, "Database Connection Notice", JOptionPane.WARNING_MESSAGE);
+-            } else {
+-                System.err.println("[Notice] Headless environment detected:\n" + message);
+-            }
+-        }
+-
+-        
+         if (!java.awt.GraphicsEnvironment.isHeadless()) {
+             SwingUtilities.invokeLater(() -> {
+                 MainFrame frame = new MainFrame();
+diff -ruN review1_backup/src/main/java/com/cricbid/dao/TeamDAO.java src/main/java/com/cricbid/dao/TeamDAO.java
+--- review1_backup/src/main/java/com/cricbid/dao/TeamDAO.java	2026-11-02 15:55:53
++++ src/main/java/com/cricbid/dao/TeamDAO.java	2026-11-02 15:36:58
+@@ -1,6 +1,7 @@
+ package com.cricbid.dao;
+ 
+ import com.cricbid.model.BotStrategyType;
++import com.cricbid.model.OwnerType;
+ import com.cricbid.model.Team;
+ 
+ import java.sql.SQLException;
+@@ -12,5 +13,6 @@
+     Team findById(int teamId) throws SQLException;
+     boolean updatePurse(int teamId, double newPurse) throws SQLException;
+     boolean updateStrategy(int teamId, BotStrategyType strategy) throws SQLException;
++    boolean updateOwnerType(int teamId, OwnerType ownerType) throws SQLException;
+     void resetAllPurse(double initialPurse) throws SQLException;
+ }
+diff -ruN review1_backup/src/main/java/com/cricbid/dao/impl/TeamDAOImpl.java src/main/java/com/cricbid/dao/impl/TeamDAOImpl.java
+--- review1_backup/src/main/java/com/cricbid/dao/impl/TeamDAOImpl.java	2026-11-02 15:55:56
++++ src/main/java/com/cricbid/dao/impl/TeamDAOImpl.java	2026-11-02 15:37:01
+@@ -70,6 +70,17 @@
+     }
+ 
+     @Override
++    public boolean updateOwnerType(int teamId, OwnerType ownerType) throws SQLException {
++        String sql = "UPDATE teams SET owner_type = ? WHERE team_id = ?";
++        try (Connection conn = db.getConnection();
++             PreparedStatement stmt = conn.prepareStatement(sql)) {
++            stmt.setString(1, ownerType != null ? ownerType.name() : OwnerType.BOT.name());
++            stmt.setInt(2, teamId);
++            return stmt.executeUpdate() > 0;
++        }
++    }
++
++    @Override
+     public void resetAllPurse(double initialPurse) throws SQLException {
+         String sql = "UPDATE teams SET purse_remaining = ?";
+         try (Connection conn = db.getConnection();
+diff -ruN review1_backup/src/main/java/com/cricbid/db/DBConnection.java src/main/java/com/cricbid/db/DBConnection.java
+--- review1_backup/src/main/java/com/cricbid/db/DBConnection.java	2026-11-02 15:55:49
++++ src/main/java/com/cricbid/db/DBConnection.java	2026-11-02 20:35:02
+@@ -33,8 +33,10 @@
+         return instance;
+     }
+ 
++    private String activeHost = "localhost";
++
+     private void loadProperties() {
+-        
++        // 1. Load bundled defaults from classpath first
+         try (InputStream in = getClass().getResourceAsStream("/db.properties")) {
+             if (in != null) {
+                 properties.load(in);
+@@ -42,25 +44,36 @@
+             }
+         } catch (IOException ignored) {}
+ 
+-        
+-        if (!initialized) {
+-            File propFile = new File("db.properties");
+-            if (propFile.exists()) {
+-                try (InputStream in = new FileInputStream(propFile)) {
+-                    properties.load(in);
+-                    initialized = true;
+-                } catch (IOException ignored) {}
+-            }
++        // 2. Allow external db.properties in working directory to override bundled defaults
++        File propFile = new File("db.properties");
++        if (propFile.exists()) {
++            try (InputStream in = new FileInputStream(propFile)) {
++                properties.load(in);
++                initialized = true;
++            } catch (IOException ignored) {}
+         }
+ 
+-        
+         if (!initialized) {
+-            properties.setProperty("db.url", "jdbc:mysql://localhost:3306/cricbid?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC");
++            properties.setProperty("db.url", "jdbc:mysql://localhost:3306/cricbid?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=4000");
+             properties.setProperty("db.user", "root");
+             properties.setProperty("db.password", "password");
+             properties.setProperty("db.driver", "com.mysql.cj.jdbc.Driver");
+         }
+ 
++        // Extract host from initial db.url if present
++        String url = properties.getProperty("db.url", "");
++        int idx = url.indexOf("://");
++        if (idx >= 0) {
++            String rest = url.substring(idx + 3);
++            int colonOrSlash = Math.min(
++                    rest.indexOf(':') >= 0 ? rest.indexOf(':') : rest.length(),
++                    rest.indexOf('/') >= 0 ? rest.indexOf('/') : rest.length()
++            );
++            if (colonOrSlash > 0) {
++                activeHost = rest.substring(0, colonOrSlash);
++            }
++        }
++
+         try {
+             Class.forName(properties.getProperty("db.driver", "com.mysql.cj.jdbc.Driver"));
+         } catch (ClassNotFoundException e) {
+@@ -68,6 +81,27 @@
+         }
+     }
+ 
++    public synchronized void configureHost(String host) {
++        String cleanHost = (host == null || host.trim().isEmpty()) ? "localhost" : host.trim();
++        this.activeHost = cleanHost;
++        String newUrl = String.format(
++                "jdbc:mysql://%s:3306/cricbid?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=4000",
++                cleanHost);
++        properties.setProperty("db.url", newUrl);
++    }
++
++    public synchronized String getHost() {
++        return activeHost;
++    }
++
++    public int getServerPort() {
++        try {
++            return Integer.parseInt(properties.getProperty("server.port", "5050").trim());
++        } catch (NumberFormatException e) {
++            return 5050;
++        }
++    }
++
+     
+     public Connection getConnection() throws SQLException {
+         String url = properties.getProperty("db.url");
+@@ -75,9 +109,20 @@
+         String pass = properties.getProperty("db.password");
+         try {
+             return DriverManager.getConnection(url, user, pass);
+-        } catch (SQLException e) {
+-            lastErrorMessage = e.getMessage();
+-            throw e;
++        } catch (SQLException primaryEx) {
++            // Fallback to root/password or root/<empty> if lan_setup.sql hasn't been run yet on localhost
++            if ("cricbid".equals(user)) {
++                for (String fallbackPass : new String[]{"password", ""}) {
++                    try {
++                        Connection conn = DriverManager.getConnection(url, "root", fallbackPass);
++                        properties.setProperty("db.user", "root");
++                        properties.setProperty("db.password", fallbackPass);
++                        return conn;
++                    } catch (SQLException ignored) {}
++                }
++            }
++            lastErrorMessage = primaryEx.getMessage();
++            throw primaryEx;
+         }
+     }
+ 
+diff -ruN review1_backup/src/main/java/com/cricbid/model/Bid.java src/main/java/com/cricbid/model/Bid.java
+--- review1_backup/src/main/java/com/cricbid/model/Bid.java	2026-11-02 15:56:42
++++ src/main/java/com/cricbid/model/Bid.java	2026-11-02 15:35:57
+@@ -1,10 +1,12 @@
+ package com.cricbid.model;
+ 
++import java.io.Serializable;
+ import java.sql.Timestamp;
+ import java.util.Objects;
+ 
+ 
+-public class Bid {
++public class Bid implements Serializable {
++    private static final long serialVersionUID = 1L;
+     private int bidId;
+     private int playerId;
+     private int teamId;
+diff -ruN review1_backup/src/main/java/com/cricbid/model/Player.java src/main/java/com/cricbid/model/Player.java
+--- review1_backup/src/main/java/com/cricbid/model/Player.java	2026-11-02 15:56:30
++++ src/main/java/com/cricbid/model/Player.java	2026-11-02 15:35:48
+@@ -1,9 +1,11 @@
+ package com.cricbid.model;
+ 
++import java.io.Serializable;
+ import java.util.Objects;
+ 
+ 
+-public abstract class Player {
++public abstract class Player implements Serializable {
++    private static final long serialVersionUID = 1L;
+     private int playerId;
+     private String name;
+     private PlayerRole role;
+diff -ruN review1_backup/src/main/java/com/cricbid/model/SquadEntry.java src/main/java/com/cricbid/model/SquadEntry.java
+--- review1_backup/src/main/java/com/cricbid/model/SquadEntry.java	2026-11-02 15:56:39
++++ src/main/java/com/cricbid/model/SquadEntry.java	2026-11-02 15:35:55
+@@ -1,9 +1,11 @@
+ package com.cricbid.model;
+ 
++import java.io.Serializable;
+ import java.util.Objects;
+ 
+ 
+-public class SquadEntry {
++public class SquadEntry implements Serializable {
++    private static final long serialVersionUID = 1L;
+     private int teamId;
+     private int playerId;
+     private double soldPrice;
+diff -ruN review1_backup/src/main/java/com/cricbid/model/Team.java src/main/java/com/cricbid/model/Team.java
+--- review1_backup/src/main/java/com/cricbid/model/Team.java	2026-11-02 15:56:35
++++ src/main/java/com/cricbid/model/Team.java	2026-11-02 15:35:53
+@@ -1,12 +1,16 @@
+ package com.cricbid.model;
+ 
++import com.cricbid.service.RuleValidator;
++
++import java.io.Serializable;
+ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.List;
+ import java.util.Objects;
+ 
+ 
+-public class Team {
++public class Team implements Serializable {
++    private static final long serialVersionUID = 1L;
+     private int teamId;
+     private String name;
+     private double purseRemaining;
+@@ -66,7 +70,7 @@
+     }
+ 
+     public int getRemainingSlotsToMinSquad() {
+-        return Math.max(0, 18 - getSquadSize());
++        return Math.max(0, RuleValidator.getActiveMinSquadSize() - getSquadSize());
+     }
+ 
+     public double getSpentAmount() {
+diff -ruN review1_backup/src/main/java/com/cricbid/model/User.java src/main/java/com/cricbid/model/User.java
+--- review1_backup/src/main/java/com/cricbid/model/User.java	2026-11-02 15:56:44
++++ src/main/java/com/cricbid/model/User.java	2026-11-02 15:36:00
+@@ -1,9 +1,11 @@
+ package com.cricbid.model;
+ 
++import java.io.Serializable;
+ import java.util.Objects;
+ 
+ 
+-public class User {
++public class User implements Serializable {
++    private static final long serialVersionUID = 1L;
+     private int userId;
+     private String username;
+     private String passwordHash;
+diff -ruN review1_backup/src/main/java/com/cricbid/network/AuctionClient.java src/main/java/com/cricbid/network/AuctionClient.java
+--- review1_backup/src/main/java/com/cricbid/network/AuctionClient.java	1970-01-01 05:30:00
++++ src/main/java/com/cricbid/network/AuctionClient.java	2026-11-02 15:38:51
+@@ -0,0 +1,267 @@
++package com.cricbid.network;
++
++import com.cricbid.model.Player;
++import com.cricbid.observer.AuctionSubject;
++import com.cricbid.service.RuleValidator;
++
++import javax.swing.SwingUtilities;
++import java.io.IOException;
++import java.io.ObjectInputStream;
++import java.io.ObjectOutputStream;
++import java.net.InetSocketAddress;
++import java.net.Socket;
++import java.util.List;
++import java.util.function.BiConsumer;
++import java.util.function.Consumer;
++
++public class AuctionClient {
++
++    private final String host;
++    private final int port;
++    private final String username;
++    private final Integer teamId;
++    private final String teamName;
++    private final AuctionSubject localSubject;
++
++    private final Object writeLock = new Object();
++    private volatile boolean running = false;
++    private volatile boolean connected = false;
++    private Socket socket;
++    private ObjectOutputStream out;
++
++    private BiConsumer<Boolean, String> connectionStatusListener;
++    private Consumer<String> bidRejectedListener;
++    private Consumer<List<Player>> upcomingPoolListener;
++    private Consumer<NetworkMessage> syncStateListener;
++    private Consumer<Boolean> auctionResetListener;
++    private Consumer<String> logBroadcastListener;
++
++    public AuctionClient(String host, int port, String username, Integer teamId, String teamName, AuctionSubject localSubject) {
++        this.host = (host == null || host.trim().isEmpty()) ? "localhost" : host.trim();
++        this.port = port;
++        this.username = username;
++        this.teamId = teamId;
++        this.teamName = teamName;
++        this.localSubject = localSubject;
++    }
++
++    public void setConnectionStatusListener(BiConsumer<Boolean, String> listener) {
++        this.connectionStatusListener = listener;
++    }
++
++    public void setBidRejectedListener(Consumer<String> listener) {
++        this.bidRejectedListener = listener;
++    }
++
++    public void setUpcomingPoolListener(Consumer<List<Player>> listener) {
++        this.upcomingPoolListener = listener;
++    }
++
++    public void setSyncStateListener(Consumer<NetworkMessage> listener) {
++        this.syncStateListener = listener;
++    }
++
++    public void setAuctionResetListener(Consumer<Boolean> listener) {
++        this.auctionResetListener = listener;
++    }
++
++    public void setLogBroadcastListener(Consumer<String> listener) {
++        this.logBroadcastListener = listener;
++    }
++
++    public void start() {
++        if (running) return;
++        running = true;
++        Thread clientThread = new Thread(this::connectionLoop, "CricBid-SocketClient");
++        clientThread.setDaemon(true);
++        clientThread.start();
++    }
++
++    private void connectionLoop() {
++        while (running) {
++            try {
++                notifyStatus(false, String.format("Connecting to Host %s:%d...", host, port));
++                Socket s = new Socket();
++                s.connect(new InetSocketAddress(host, port), 3500);
++                s.setTcpNoDelay(true);
++
++                synchronized (writeLock) {
++                    this.socket = s;
++                    this.out = new ObjectOutputStream(s.getOutputStream());
++                    this.out.flush();
++                }
++
++                ObjectInputStream in = new ObjectInputStream(s.getInputStream());
++                this.connected = true;
++                notifyStatus(true, String.format("Connected to Host (%s:%d)", host, port));
++
++                // Register this laptop's franchise with Host Server
++                send(new NetworkMessage(MessageType.REGISTER_CLIENT)
++                        .setUsername(username)
++                        .setTeamId(teamId)
++                        .setText(teamName));
++
++                while (running && !s.isClosed()) {
++                    Object obj = in.readObject();
++                    if (obj instanceof NetworkMessage) {
++                        dispatchMessage((NetworkMessage) obj);
++                    }
++                }
++            } catch (Exception e) {
++                this.connected = false;
++                if (running) {
++                    notifyStatus(false, String.format("Waiting for Auctioneer Host at %s:%d (retrying)...", host, port));
++                    try {
++                        Thread.sleep(2000);
++                    } catch (InterruptedException ie) {
++                        Thread.currentThread().interrupt();
++                        break;
++                    }
++                }
++            } finally {
++                closeSocketQuietly();
++            }
++        }
++    }
++
++    private void dispatchMessage(NetworkMessage msg) {
++        switch (msg.getType()) {
++            case SYNC_STATE:
++                RuleValidator.setQuickModeActive(msg.isQuickMode());
++                if (syncStateListener != null) {
++                    SwingUtilities.invokeLater(() -> syncStateListener.accept(msg));
++                }
++                break;
++
++            case AUCTION_RESET:
++                RuleValidator.setQuickModeActive(msg.isQuickMode());
++                if (auctionResetListener != null) {
++                    SwingUtilities.invokeLater(() -> auctionResetListener.accept(msg.isQuickMode()));
++                }
++                break;
++
++            case PLAYER_UP:
++                RuleValidator.setQuickModeActive(msg.isQuickMode());
++                if (upcomingPoolListener != null && msg.getUpcomingPool() != null) {
++                    SwingUtilities.invokeLater(() -> upcomingPoolListener.accept(msg.getUpcomingPool()));
++                }
++                if (msg.getPlayer() != null) {
++                    localSubject.notifyPlayerUpForAuction(msg.getPlayer(), msg.getAmount(), msg.getRoundDurationSec());
++                }
++                break;
++
++            case BID_PLACED:
++                if (msg.getBid() != null && msg.getTeam() != null && msg.getPlayer() != null) {
++                    localSubject.notifyBidPlaced(msg.getBid(), msg.getTeam(), msg.getPlayer());
++                }
++                break;
++
++            case PLAYER_SOLD:
++                if (msg.getPlayer() != null && msg.getTeam() != null) {
++                    localSubject.notifyPlayerSold(msg.getPlayer(), msg.getTeam(), msg.getAmount());
++                }
++                break;
++
++            case PLAYER_UNSOLD:
++                if (msg.getPlayer() != null) {
++                    localSubject.notifyPlayerUnsold(msg.getPlayer());
++                }
++                break;
++
++            case TIMER_TICK:
++                localSubject.notifyTimerTick(msg.getSecondsRemaining());
++                break;
++
++            case AUCTION_PAUSED:
++                localSubject.notifyAuctionPaused(msg.isPaused());
++                break;
++
++            case AUCTION_COMPLETED:
++                localSubject.notifyAuctionCompleted();
++                break;
++
++            case RULE_VIOLATION:
++                localSubject.notifyRuleViolation(msg.getText());
++                break;
++
++            case BID_REJECTED:
++                if (bidRejectedListener != null) {
++                    SwingUtilities.invokeLater(() -> bidRejectedListener.accept(msg.getText()));
++                }
++                break;
++
++            case LOG_BROADCAST:
++                if (logBroadcastListener != null && msg.getText() != null) {
++                    SwingUtilities.invokeLater(() -> logBroadcastListener.accept(msg.getText()));
++                }
++                break;
++
++            default:
++                break;
++        }
++    }
++
++    public boolean isConnected() {
++        return connected;
++    }
++
++    public String getHost() {
++        return host;
++    }
++
++    public int getPort() {
++        return port;
++    }
++
++    public void sendBid(int bidTeamId, double amount) throws IOException {
++        if (!connected) {
++            throw new IOException("Not connected to Auctioneer Host (" + host + ":" + port + "). Make sure Laptop 1 (admin) is logged in.");
++        }
++        send(new NetworkMessage(MessageType.PLACE_BID)
++                .setTeamId(bidTeamId)
++                .setAmount(amount));
++    }
++
++    public void sendPass(String passerTeamName) {
++        if (connected) {
++            try {
++                send(new NetworkMessage(MessageType.PASS_PLAYER).setText(passerTeamName));
++            } catch (IOException ignored) {}
++        }
++    }
++
++    private void send(NetworkMessage msg) throws IOException {
++        synchronized (writeLock) {
++            if (out == null || socket == null || socket.isClosed()) {
++                throw new IOException("Socket connection is not open.");
++            }
++            out.reset();
++            out.writeObject(msg);
++            out.flush();
++        }
++    }
++
++    private void notifyStatus(boolean isConn, String statusText) {
++        if (connectionStatusListener != null) {
++            SwingUtilities.invokeLater(() -> connectionStatusListener.accept(isConn, statusText));
++        }
++    }
++
++    public void stop() {
++        running = false;
++        connected = false;
++        closeSocketQuietly();
++    }
++
++    private void closeSocketQuietly() {
++        synchronized (writeLock) {
++            if (socket != null) {
++                try {
++                    socket.close();
++                } catch (IOException ignored) {}
++                socket = null;
++                out = null;
++            }
++        }
++    }
++}
+diff -ruN review1_backup/src/main/java/com/cricbid/network/AuctionServer.java src/main/java/com/cricbid/network/AuctionServer.java
+--- review1_backup/src/main/java/com/cricbid/network/AuctionServer.java	1970-01-01 05:30:00
++++ src/main/java/com/cricbid/network/AuctionServer.java	2026-11-02 15:38:45
+@@ -0,0 +1,331 @@
++package com.cricbid.network;
++
++import com.cricbid.exception.CricBidException;
++import com.cricbid.model.Bid;
++import com.cricbid.model.OwnerType;
++import com.cricbid.model.Player;
++import com.cricbid.model.Team;
++import com.cricbid.observer.AuctionObserver;
++import com.cricbid.service.AuctionService;
++import com.cricbid.service.TeamService;
++
++import javax.swing.SwingUtilities;
++import java.io.EOFException;
++import java.io.IOException;
++import java.io.ObjectInputStream;
++import java.io.ObjectOutputStream;
++import java.net.ServerSocket;
++import java.net.Socket;
++import java.sql.SQLException;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.CopyOnWriteArrayList;
++import java.util.function.Consumer;
++
++public class AuctionServer implements AuctionObserver {
++
++    private final int port;
++    private final AuctionService auctionService;
++    private final TeamService teamService;
++    private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
++
++    private volatile boolean active = false;
++    private ServerSocket serverSocket;
++    private Consumer<List<String>> clientListListener;
++    private Consumer<String> activityLogListener;
++
++    public AuctionServer(int port, AuctionService auctionService, TeamService teamService) {
++        this.port = port;
++        this.auctionService = auctionService;
++        this.teamService = teamService;
++    }
++
++    public void setClientListListener(Consumer<List<String>> listener) {
++        this.clientListListener = listener;
++        notifyClientListChanged();
++    }
++
++    public void setActivityLogListener(Consumer<String> listener) {
++        this.activityLogListener = listener;
++    }
++
++    public void start() throws IOException {
++        if (active) return;
++
++        serverSocket = new ServerSocket();
++        serverSocket.setReuseAddress(true);
++        serverSocket.bind(new java.net.InetSocketAddress(port));
++        active = true;
++
++        auctionService.getAuctionSubject().addObserver(this);
++
++        Thread acceptThread = new Thread(this::acceptLoop, "CricBid-SocketServer-Accept");
++        acceptThread.setDaemon(true);
++        acceptThread.start();
++    }
++
++    private void acceptLoop() {
++        while (active) {
++            try {
++                Socket clientSocket = serverSocket.accept();
++                clientSocket.setTcpNoDelay(true);
++                ClientHandler handler = new ClientHandler(clientSocket);
++                clients.add(handler);
++                Thread reader = new Thread(handler, "CricBid-ClientHandler-" + clientSocket.getInetAddress());
++                reader.setDaemon(true);
++                reader.start();
++            } catch (IOException e) {
++                if (active) {
++                    System.err.println("[AuctionServer] Accept error: " + e.getMessage());
++                }
++            }
++        }
++    }
++
++    public void stop() {
++        active = false;
++        auctionService.getAuctionSubject().removeObserver(this);
++        for (ClientHandler client : clients) {
++            client.closeQuietly();
++        }
++        clients.clear();
++        if (serverSocket != null && !serverSocket.isClosed()) {
++            try {
++                serverSocket.close();
++            } catch (IOException ignored) {}
++        }
++    }
++
++    public int getPort() {
++        return port;
++    }
++
++    public List<String> getConnectedClientLabels() {
++        List<String> labels = new ArrayList<>();
++        for (ClientHandler c : clients) {
++            labels.add(c.getDisplayLabel());
++        }
++        return labels;
++    }
++
++    public void broadcastAuctionReset(boolean quickMode) {
++        broadcast(new NetworkMessage(MessageType.AUCTION_RESET).setQuickMode(quickMode));
++    }
++
++    private void broadcast(NetworkMessage msg) {
++        for (ClientHandler client : clients) {
++            client.send(msg);
++        }
++    }
++
++    private void notifyClientListChanged() {
++        if (clientListListener != null) {
++            List<String> snapshot = getConnectedClientLabels();
++            SwingUtilities.invokeLater(() -> clientListListener.accept(snapshot));
++        }
++    }
++
++    private void logActivity(String message) {
++        if (activityLogListener != null) {
++            SwingUtilities.invokeLater(() -> activityLogListener.accept(message));
++        }
++    }
++
++    // --- AuctionObserver callbacks on Host ---
++
++    @Override
++    public void onPlayerUpForAuction(Player player, double currentPrice, int roundDurationSec) {
++        broadcast(new NetworkMessage(MessageType.PLAYER_UP)
++                .setPlayer(player)
++                .setAmount(currentPrice)
++                .setRoundDurationSec(roundDurationSec)
++                .setQuickMode(auctionService.isQuickMode())
++                .setUpcomingPool(auctionService.getUpcomingPoolSnapshot()));
++    }
++
++    @Override
++    public void onBidPlaced(Bid bid, Team team, Player player) {
++        broadcast(new NetworkMessage(MessageType.BID_PLACED)
++                .setBid(bid)
++                .setTeam(team)
++                .setPlayer(player)
++                .setRoundDurationSec(auctionService.getRoundDurationSec()));
++    }
++
++    @Override
++    public void onPlayerSold(Player player, Team team, double finalPrice) {
++        broadcast(new NetworkMessage(MessageType.PLAYER_SOLD)
++                .setPlayer(player)
++                .setTeam(team)
++                .setAmount(finalPrice));
++    }
++
++    @Override
++    public void onPlayerUnsold(Player player) {
++        broadcast(new NetworkMessage(MessageType.PLAYER_UNSOLD)
++                .setPlayer(player));
++    }
++
++    @Override
++    public void onTimerTick(int secondsRemaining) {
++        broadcast(new NetworkMessage(MessageType.TIMER_TICK)
++                .setSecondsRemaining(secondsRemaining));
++    }
++
++    @Override
++    public void onAuctionPaused(boolean isPaused) {
++        broadcast(new NetworkMessage(MessageType.AUCTION_PAUSED)
++                .setPaused(isPaused));
++    }
++
++    @Override
++    public void onAuctionCompleted() {
++        broadcast(new NetworkMessage(MessageType.AUCTION_COMPLETED));
++    }
++
++    @Override
++    public void onRuleViolation(String message) {
++        broadcast(new NetworkMessage(MessageType.RULE_VIOLATION)
++                .setText(message));
++    }
++
++    // --- Per-Client Worker ---
++
++    private class ClientHandler implements Runnable {
++        private final Socket socket;
++        private final Object writeLock = new Object();
++        private ObjectOutputStream out;
++        private ObjectInputStream in;
++        private String username = "Participant";
++        private String teamName = "Connecting...";
++        private Integer teamId;
++
++        ClientHandler(Socket socket) {
++            this.socket = socket;
++        }
++
++        String getDisplayLabel() {
++            return teamName + " (" + username + ")";
++        }
++
++        @Override
++        public void run() {
++            try {
++                out = new ObjectOutputStream(socket.getOutputStream());
++                out.flush();
++                in = new ObjectInputStream(socket.getInputStream());
++
++                while (active && !socket.isClosed()) {
++                    Object obj = in.readObject();
++                    if (obj instanceof NetworkMessage) {
++                        handleClientMessage((NetworkMessage) obj);
++                    }
++                }
++            } catch (EOFException ignored) {
++                // Client disconnected normally
++            } catch (Exception e) {
++                if (active) {
++                    System.err.println("[AuctionServer] Client disconnected (" + getDisplayLabel() + "): " + e.getMessage());
++                }
++            } finally {
++                clients.remove(this);
++                closeQuietly();
++                notifyClientListChanged();
++                logActivity("[NETWORK] Disconnected: " + getDisplayLabel());
++            }
++        }
++
++        private void handleClientMessage(NetworkMessage msg) {
++            switch (msg.getType()) {
++                case REGISTER_CLIENT:
++                    this.username = msg.getUsername() != null ? msg.getUsername() : "owner";
++                    this.teamId = msg.getTeamId();
++                    if (this.teamId != null) {
++                        try {
++                            teamService.updateOwnerType(this.teamId, OwnerType.HUMAN);
++                            Team t = teamService.getTeamById(this.teamId);
++                            if (t != null) {
++                                this.teamName = t.getName();
++                            }
++                        } catch (SQLException ignored) {}
++                    } else if (msg.getText() != null) {
++                        this.teamName = msg.getText();
++                    }
++                    notifyClientListChanged();
++                    logActivity("[NETWORK] Laptop joined: " + getDisplayLabel() + " from " + socket.getInetAddress().getHostAddress());
++                    sendSyncState();
++                    break;
++
++                case PLACE_BID:
++                    handleRemoteBid(msg);
++                    break;
++
++                case PASS_PLAYER:
++                    String passer = msg.getText() != null ? msg.getText() : teamName;
++                    String passLine = "  [PASS] " + passer + " passed on current player.";
++                    logActivity(passLine);
++                    broadcast(new NetworkMessage(MessageType.LOG_BROADCAST).setText(passLine));
++                    break;
++
++                default:
++                    break;
++            }
++        }
++
++        private void handleRemoteBid(NetworkMessage msg) {
++            Integer bidTeamId = msg.getTeamId() != null ? msg.getTeamId() : this.teamId;
++            if (bidTeamId == null) {
++                send(new NetworkMessage(MessageType.BID_REJECTED).setText("No team associated with this session."));
++                return;
++            }
++            try {
++                Team biddingTeam = teamService.getTeamById(bidTeamId);
++                if (biddingTeam == null) {
++                    send(new NetworkMessage(MessageType.BID_REJECTED).setText("Team ID " + bidTeamId + " not found."));
++                    return;
++                }
++                biddingTeam.setOwnerType(OwnerType.HUMAN);
++                auctionService.placeHumanBid(biddingTeam, msg.getAmount());
++            } catch (CricBidException ex) {
++                send(new NetworkMessage(MessageType.BID_REJECTED).setText(ex.getMessage()));
++            } catch (SQLException ex) {
++                send(new NetworkMessage(MessageType.BID_REJECTED).setText("Database error: " + ex.getMessage()));
++            }
++        }
++
++        private void sendSyncState() {
++            NetworkMessage sync = new NetworkMessage(MessageType.SYNC_STATE)
++                    .setRunning(auctionService.isRunning())
++                    .setPaused(auctionService.isPaused())
++                    .setQuickMode(auctionService.isQuickMode())
++                    .setPlayer(auctionService.getCurrentPlayer())
++                    .setAmount(auctionService.getCurrentPrice())
++                    .setBid(auctionService.getCurrentHighestBid())
++                    .setTeam(auctionService.getCurrentLeadingTeam())
++                    .setRoundHasBids(auctionService.isRoundHasBids())
++                    .setRoundDurationSec(auctionService.getRoundDurationSec())
++                    .setSecondsRemaining(auctionService.getSecondsRemaining())
++                    .setUpcomingPool(auctionService.getUpcomingPoolSnapshot());
++            send(sync);
++        }
++
++        void send(NetworkMessage msg) {
++            synchronized (writeLock) {
++                if (out == null || socket.isClosed()) return;
++                try {
++                    out.reset();
++                    out.writeObject(msg);
++                    out.flush();
++                } catch (IOException e) {
++                    closeQuietly();
++                }
++            }
++        }
++
++        void closeQuietly() {
++            try {
++                socket.close();
++            } catch (IOException ignored) {}
++        }
++    }
++}
+diff -ruN review1_backup/src/main/java/com/cricbid/network/MessageType.java src/main/java/com/cricbid/network/MessageType.java
+--- review1_backup/src/main/java/com/cricbid/network/MessageType.java	1970-01-01 05:30:00
++++ src/main/java/com/cricbid/network/MessageType.java	2026-11-02 15:38:39
+@@ -0,0 +1,22 @@
++package com.cricbid.network;
++
++public enum MessageType {
++    // Client -> Host Server
++    REGISTER_CLIENT,
++    PLACE_BID,
++    PASS_PLAYER,
++
++    // Host Server -> Clients
++    SYNC_STATE,
++    AUCTION_RESET,
++    PLAYER_UP,
++    BID_PLACED,
++    PLAYER_SOLD,
++    PLAYER_UNSOLD,
++    TIMER_TICK,
++    AUCTION_PAUSED,
++    AUCTION_COMPLETED,
++    RULE_VIOLATION,
++    BID_REJECTED,
++    LOG_BROADCAST
++}
+diff -ruN review1_backup/src/main/java/com/cricbid/network/NetworkMessage.java src/main/java/com/cricbid/network/NetworkMessage.java
+--- review1_backup/src/main/java/com/cricbid/network/NetworkMessage.java	1970-01-01 05:30:00
++++ src/main/java/com/cricbid/network/NetworkMessage.java	2026-11-02 15:38:42
+@@ -0,0 +1,162 @@
++package com.cricbid.network;
++
++import com.cricbid.model.Bid;
++import com.cricbid.model.Player;
++import com.cricbid.model.Team;
++
++import java.io.Serializable;
++import java.util.List;
++
++public class NetworkMessage implements Serializable {
++    private static final long serialVersionUID = 1L;
++
++    private final MessageType type;
++    private Player player;
++    private Team team;
++    private Bid bid;
++    private double amount;
++    private int roundDurationSec;
++    private int secondsRemaining;
++    private boolean paused;
++    private boolean running;
++    private boolean roundHasBids;
++    private boolean quickMode;
++    private Integer teamId;
++    private String username;
++    private String text;
++    private List<Player> upcomingPool;
++
++    public NetworkMessage(MessageType type) {
++        this.type = type;
++    }
++
++    public MessageType getType() {
++        return type;
++    }
++
++    public Player getPlayer() {
++        return player;
++    }
++
++    public NetworkMessage setPlayer(Player player) {
++        this.player = player;
++        return this;
++    }
++
++    public Team getTeam() {
++        return team;
++    }
++
++    public NetworkMessage setTeam(Team team) {
++        this.team = team;
++        return this;
++    }
++
++    public Bid getBid() {
++        return bid;
++    }
++
++    public NetworkMessage setBid(Bid bid) {
++        this.bid = bid;
++        return this;
++    }
++
++    public double getAmount() {
++        return amount;
++    }
++
++    public NetworkMessage setAmount(double amount) {
++        this.amount = amount;
++        return this;
++    }
++
++    public int getRoundDurationSec() {
++        return roundDurationSec;
++    }
++
++    public NetworkMessage setRoundDurationSec(int roundDurationSec) {
++        this.roundDurationSec = roundDurationSec;
++        return this;
++    }
++
++    public int getSecondsRemaining() {
++        return secondsRemaining;
++    }
++
++    public NetworkMessage setSecondsRemaining(int secondsRemaining) {
++        this.secondsRemaining = secondsRemaining;
++        return this;
++    }
++
++    public boolean isPaused() {
++        return paused;
++    }
++
++    public NetworkMessage setPaused(boolean paused) {
++        this.paused = paused;
++        return this;
++    }
++
++    public boolean isRunning() {
++        return running;
++    }
++
++    public NetworkMessage setRunning(boolean running) {
++        this.running = running;
++        return this;
++    }
++
++    public boolean isRoundHasBids() {
++        return roundHasBids;
++    }
++
++    public NetworkMessage setRoundHasBids(boolean roundHasBids) {
++        this.roundHasBids = roundHasBids;
++        return this;
++    }
++
++    public boolean isQuickMode() {
++        return quickMode;
++    }
++
++    public NetworkMessage setQuickMode(boolean quickMode) {
++        this.quickMode = quickMode;
++        return this;
++    }
++
++    public Integer getTeamId() {
++        return teamId;
++    }
++
++    public NetworkMessage setTeamId(Integer teamId) {
++        this.teamId = teamId;
++        return this;
++    }
++
++    public String getUsername() {
++        return username;
++    }
++
++    public NetworkMessage setUsername(String username) {
++        this.username = username;
++        return this;
++    }
++
++    public String getText() {
++        return text;
++    }
++
++    public NetworkMessage setText(String text) {
++        this.text = text;
++        return this;
++    }
++
++    public List<Player> getUpcomingPool() {
++        return upcomingPool;
++    }
++
++    public NetworkMessage setUpcomingPool(List<Player> upcomingPool) {
++        this.upcomingPool = upcomingPool;
++        return this;
++    }
++}
+diff -ruN review1_backup/src/main/java/com/cricbid/network/NetworkUtils.java src/main/java/com/cricbid/network/NetworkUtils.java
+--- review1_backup/src/main/java/com/cricbid/network/NetworkUtils.java	1970-01-01 05:30:00
++++ src/main/java/com/cricbid/network/NetworkUtils.java	2026-11-02 15:38:37
+@@ -0,0 +1,52 @@
++package com.cricbid.network;
++
++import java.net.Inet4Address;
++import java.net.InetAddress;
++import java.net.NetworkInterface;
++import java.util.Enumeration;
++
++public final class NetworkUtils {
++
++    private NetworkUtils() {}
++
++    /**
++     * Detects the primary LAN / Wi-Fi / Mobile Hotspot IPv4 address of this machine.
++     */
++    public static String getLocalLanIp() {
++        String fallbackIp = null;
++        try {
++            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
++            while (interfaces != null && interfaces.hasMoreElements()) {
++                NetworkInterface iface = interfaces.nextElement();
++                if (!iface.isUp() || iface.isLoopback() || iface.isVirtual()) {
++                    continue;
++                }
++                String name = iface.getName().toLowerCase();
++                if (name.startsWith("utun") || name.startsWith("awdl") || name.startsWith("llw")
++                        || name.startsWith("bridge") || name.startsWith("docker") || name.startsWith("veth")) {
++                    continue;
++                }
++
++                Enumeration<InetAddress> addresses = iface.getInetAddresses();
++                while (addresses.hasMoreElements()) {
++                    InetAddress addr = addresses.nextElement();
++                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
++                        String ip = addr.getHostAddress();
++                        if (name.startsWith("en") || name.startsWith("wlan") || name.startsWith("wi")) {
++                            return ip;
++                        }
++                        if (fallbackIp == null && addr.isSiteLocalAddress()) {
++                            fallbackIp = ip;
++                        }
++                    }
++                }
++            }
++            if (fallbackIp != null) {
++                return fallbackIp;
++            }
++            return InetAddress.getLocalHost().getHostAddress();
++        } catch (Exception ignored) {
++            return "localhost";
++        }
++    }
++}
+diff -ruN review1_backup/src/main/java/com/cricbid/service/AuctionService.java src/main/java/com/cricbid/service/AuctionService.java
+--- review1_backup/src/main/java/com/cricbid/service/AuctionService.java	2026-11-02 15:59:17
++++ src/main/java/com/cricbid/service/AuctionService.java	2026-11-02 15:37:18
+@@ -68,11 +68,12 @@
+     private boolean roundHasBids = false;
+ 
+     
+-    private int roundDurationSec = 10;
+-    private int secondsRemaining = 10;
++    private int roundDurationSec = 15;
++    private int secondsRemaining = 15;
+     private boolean isPaused = false;
+     private boolean isRunning = false;
+-    private boolean botsEnabled = true;   
++    private boolean quickMode = false;
++    private boolean botsEnabled = false;   
+     private int botDelayMinMs = 2000;      
+     private int botDelayMaxMs = 4000;
+ 
+@@ -132,6 +133,8 @@
+         try {
+             stopBotExecutor();
+             this.roundDurationSec = Math.max(5, Math.min(30, durationSec));
++            this.quickMode = quickMode;
++            RuleValidator.setQuickModeActive(quickMode);
+             this.isPaused = false;
+             this.isRunning = true;
+ 
+@@ -184,24 +187,35 @@
+ 
+     
+     public boolean placeBid(Team team, double amount) throws CricBidException, SQLException {
++        return placeBid(team, amount, team != null && team.getOwnerType() == OwnerType.HUMAN);
++    }
++
++    public boolean placeHumanBid(Team team, double amount) throws CricBidException, SQLException {
++        return placeBid(team, amount, true);
++    }
++
++    public boolean placeBid(Team team, double amount, boolean isHumanBidder) throws CricBidException, SQLException {
+         auctionLock.lock();
+         try {
+             if (!isRunning || isPaused || currentPlayer == null) {
+-                throw new CricBidException("No active player up for auction.");
++                throw new CricBidException(isPaused ? "Auction is currently paused." : "No active player up for auction.");
+             }
+ 
+-            
+-            boolean isHuman = (team.getOwnerType() == OwnerType.HUMAN);
++            boolean isHuman = isHumanBidder || (team.getOwnerType() == OwnerType.HUMAN);
+             if (!isHuman && humanHasBidThisRound) {
+-                
+                 return false;
+             }
+ 
+-            
+             teamService.loadSquadForTeam(team);
+             Team refreshedTeam = teamDAO.findById(team.getTeamId());
+             if (refreshedTeam != null) {
+                 team.setPurseRemaining(refreshedTeam.getPurseRemaining());
++                if (isHumanBidder && refreshedTeam.getOwnerType() != OwnerType.HUMAN) {
++                    team.setOwnerType(OwnerType.HUMAN);
++                    teamDAO.updateOwnerType(team.getTeamId(), OwnerType.HUMAN);
++                } else {
++                    team.setOwnerType(refreshedTeam.getOwnerType());
++                }
+             }
+ 
+             Integer leadingTeamId = (currentLeadingTeam != null) ? currentLeadingTeam.getTeamId() : null;
+@@ -433,9 +447,29 @@
+ 
+     
+     public double suggestBidForHuman(Team humanTeam) {
+-        if (humanTeam == null || currentPlayer == null) return 0.0;
++        return suggestBidForPlayer(humanTeam, currentPlayer);
++    }
++
++    public double suggestBidForPlayer(Team humanTeam, Player targetPlayer) {
++        if (humanTeam == null || targetPlayer == null) return 0.0;
+         BiddingStrategy strategy = strategyMap.get(BotStrategyType.BALANCED);
+-        return Math.round(strategy.calculateMaxBid(humanTeam, currentPlayer) * 100.0) / 100.0;
++        return Math.round(strategy.calculateMaxBid(humanTeam, targetPlayer) * 100.0) / 100.0;
++    }
++
++    public boolean isQuickMode() {
++        return quickMode;
++    }
++
++    public List<Player> getUpcomingPoolSnapshot() {
++        auctionLock.lock();
++        try {
++            if (currentPoolIndex >= auctionPool.size()) {
++                return Collections.emptyList();
++            }
++            return new ArrayList<>(auctionPool.subList(currentPoolIndex, auctionPool.size()));
++        } finally {
++            auctionLock.unlock();
++        }
+     }
+ 
+     
+diff -ruN review1_backup/src/main/java/com/cricbid/service/ReportService.java src/main/java/com/cricbid/service/ReportService.java
+--- review1_backup/src/main/java/com/cricbid/service/ReportService.java	2026-11-02 15:55:51
++++ src/main/java/com/cricbid/service/ReportService.java	2026-11-02 15:50:54
+@@ -77,7 +77,7 @@
+             allBuys.addAll(squadDAO.getSquadByTeam(team.getTeamId()));
+         }
+         allBuys.sort(Comparator.comparingDouble(SquadEntry::getSoldPrice).reversed());
+-        return allBuys.stream().limit(limit).toList();
++        return allBuys.stream().limit(limit).collect(java.util.stream.Collectors.toList());
+     }
+ 
+     
+diff -ruN review1_backup/src/main/java/com/cricbid/service/RuleValidator.java src/main/java/com/cricbid/service/RuleValidator.java
+--- review1_backup/src/main/java/com/cricbid/service/RuleValidator.java	2026-11-02 15:56:01
++++ src/main/java/com/cricbid/service/RuleValidator.java	2026-11-02 15:35:45
+@@ -15,11 +15,31 @@
+     public static final double STARTING_PURSE = 100.00;
+     public static final int MAX_SQUAD_SIZE = 25;
+     public static final int MIN_SQUAD_SIZE = 18;
++    public static final int QUICK_MIN_SQUAD_SIZE = 8;
+     public static final int MAX_OVERSEAS_PLAYERS = 8;
+     public static final int MIN_BOWLERS = 5;
++    public static final int QUICK_MIN_BOWLERS = 2;
+     public static final int MIN_WICKETKEEPERS = 1;
+     public static final double MIN_SLOT_RESERVE_PRICE = 0.20; 
+ 
++    private static volatile boolean quickModeActive = false;
++
++    public static void setQuickModeActive(boolean quickMode) {
++        quickModeActive = quickMode;
++    }
++
++    public static boolean isQuickModeActive() {
++        return quickModeActive;
++    }
++
++    public static int getActiveMinSquadSize() {
++        return quickModeActive ? QUICK_MIN_SQUAD_SIZE : MIN_SQUAD_SIZE;
++    }
++
++    public static int getActiveMinBowlers() {
++        return quickModeActive ? QUICK_MIN_BOWLERS : MIN_BOWLERS;
++    }
++
+     
+     public static double getNextValidBidAmount(double currentPrice, boolean hasExistingBids) {
+         if (!hasExistingBids) {
+@@ -78,9 +98,13 @@
+         }
+ 
+         
++        
++        
++        int activeMinSquad = getActiveMinSquadSize();
++        int activeMinBowlers = getActiveMinBowlers();
+         int currentSquadSize = team.getSquadSize();
+         int squadSizeAfterWinning = currentSquadSize + 1;
+-        int remainingSlotsNeededToMin = Math.max(0, MIN_SQUAD_SIZE - squadSizeAfterWinning);
++        int remainingSlotsNeededToMin = Math.max(0, activeMinSquad - squadSizeAfterWinning);
+         double requiredReserveFunds = remainingSlotsNeededToMin * MIN_SLOT_RESERVE_PRICE;
+         double remainingPurseAfterBid = team.getPurseRemaining() - proposedAmount;
+ 
+@@ -88,20 +112,22 @@
+             throw new ReserveViolationException(String.format(
+                     "Reserve Rule Violation: Team '%s' needs %.2f Cr in reserve for %d remaining mandatory slots (min squad %d), but would only have %.2f Cr left after bidding %.2f Cr.",
+                     team.getName(), requiredReserveFunds, remainingSlotsNeededToMin,
+-                    MIN_SQUAD_SIZE, remainingPurseAfterBid, proposedAmount));
++                    activeMinSquad, remainingPurseAfterBid, proposedAmount));
+         }
+     }
+ 
+     
+     public String getRosterComplianceIssues(Team team) {
++        int activeMinSquad = getActiveMinSquadSize();
++        int activeMinBowlers = getActiveMinBowlers();
+         StringBuilder sb = new StringBuilder();
+-        if (team.getSquadSize() < MIN_SQUAD_SIZE) {
++        if (team.getSquadSize() < activeMinSquad) {
+             sb.append(String.format("- Squad size (%d) is below minimum of %d.\n",
+-                    team.getSquadSize(), MIN_SQUAD_SIZE));
++                    team.getSquadSize(), activeMinSquad));
+         }
+-        if (team.getBowlerCount() < MIN_BOWLERS) {
++        if (team.getBowlerCount() < activeMinBowlers) {
+             sb.append(String.format("- Bowlers (%d) is below minimum of %d.\n",
+-                    team.getBowlerCount(), MIN_BOWLERS));
++                    team.getBowlerCount(), activeMinBowlers));
+         }
+         if (team.getWicketKeeperCount() < MIN_WICKETKEEPERS) {
+             sb.append(String.format("- Wicketkeepers (%d) is below minimum of %d.\n",
+diff -ruN review1_backup/src/main/java/com/cricbid/service/TeamService.java src/main/java/com/cricbid/service/TeamService.java
+--- review1_backup/src/main/java/com/cricbid/service/TeamService.java	2026-11-02 15:55:58
++++ src/main/java/com/cricbid/service/TeamService.java	2026-11-02 15:37:06
+@@ -10,7 +10,9 @@
+ import com.cricbid.model.Team;
+ 
+ import java.sql.SQLException;
++import java.util.Collections;
+ import java.util.List;
++import java.util.Set;
+ 
+ 
+ public class TeamService {
+@@ -65,13 +67,24 @@
+         teamDAO.updatePurse(teamId, newPurse);
+     }
+ 
++    public void updateOwnerType(int teamId, OwnerType ownerType) throws SQLException {
++        teamDAO.updateOwnerType(teamId, ownerType);
++    }
++
+     public void resetAllTeams(double startingPurse, int humanTeamId) throws SQLException {
++        resetAllTeams(startingPurse, Collections.singleton(humanTeamId));
++    }
++
++    public void resetAllTeams(double startingPurse, Set<Integer> humanTeamIds) throws SQLException {
+         squadDAO.clearSquads();
+         List<Team> teams = teamDAO.findAll();
+         for (Team t : teams) {
++            OwnerType type = (humanTeamIds != null && humanTeamIds.contains(t.getTeamId()))
++                    ? OwnerType.HUMAN : OwnerType.BOT;
+             t.setPurseRemaining(startingPurse);
+-            t.setOwnerType(t.getTeamId() == humanTeamId ? OwnerType.HUMAN : OwnerType.BOT);
++            t.setOwnerType(type);
+             teamDAO.updatePurse(t.getTeamId(), startingPurse);
++            teamDAO.updateOwnerType(t.getTeamId(), type);
+         }
+     }
+ 
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/BotControlPanel.java src/main/java/com/cricbid/ui/BotControlPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/BotControlPanel.java	2026-11-02 15:59:26
++++ src/main/java/com/cricbid/ui/BotControlPanel.java	2026-11-02 15:42:15
+@@ -7,7 +7,6 @@
+ import com.cricbid.service.TeamService;
+ 
+ import javax.swing.BorderFactory;
+-import javax.swing.JButton;
+ import javax.swing.JComboBox;
+ import javax.swing.JLabel;
+ import javax.swing.JOptionPane;
+@@ -35,6 +34,7 @@
+ 
+     private JToggleButton botToggleBtn;
+     private JSlider botSpeedSlider;
++    private JPanel teamStrategiesPanel;
+     private final Map<Integer, JComboBox<BotStrategyType>> strategyCombos = new HashMap<>();
+ 
+     public BotControlPanel(AuctionService auctionService, TeamService teamService) {
+@@ -58,14 +58,13 @@
+         masterControlPanel.add(new JLabel("Bot Activity State:"), gbc);
+ 
+         gbc.gridx = 1;
+-        botToggleBtn = new JToggleButton("Bots Active (Click to Pause)", true);
+-        botToggleBtn.setPreferredSize(new Dimension(220, 32));
+-        botToggleBtn.setBackground(new Color(220, 245, 220));
++        botToggleBtn = new JToggleButton("Bots PAUSED (Click to Enable)", false);
++        botToggleBtn.setPreferredSize(new Dimension(240, 32));
++        botToggleBtn.setBackground(new Color(255, 220, 220));
+         botToggleBtn.addActionListener(e -> {
+             boolean active = botToggleBtn.isSelected();
+             auctionService.setBotsEnabled(active);
+-            botToggleBtn.setText(active ? "Bots Active (Click to Pause)" : "Bots PAUSED (Click to Resume)");
+-            botToggleBtn.setBackground(active ? new Color(220, 245, 220) : new Color(255, 220, 220));
++            syncToggleStyle(active);
+         });
+         masterControlPanel.add(botToggleBtn, gbc);
+ 
+@@ -90,9 +89,22 @@
+ 
+         add(masterControlPanel, BorderLayout.NORTH);
+ 
+-        JPanel teamStrategiesPanel = new JPanel(new GridLayout(0, 2, 12, 12));
++        teamStrategiesPanel = new JPanel(new GridLayout(0, 2, 12, 12));
+         teamStrategiesPanel.setBorder(BorderFactory.createTitledBorder("Swap Bot Strategies at Runtime (Strategy Pattern)"));
++        add(teamStrategiesPanel, BorderLayout.CENTER);
++    }
+ 
++    private void syncToggleStyle(boolean active) {
++        botToggleBtn.setSelected(active);
++        botToggleBtn.setText(active ? "Bots Active (Click to Pause)" : "Bots PAUSED (Click to Enable)");
++        botToggleBtn.setBackground(active ? new Color(220, 245, 220) : new Color(255, 220, 220));
++    }
++
++    public void refreshBots() {
++        syncToggleStyle(auctionService.isBotsEnabled());
++        teamStrategiesPanel.removeAll();
++        strategyCombos.clear();
++
+         try {
+             List<Team> teams = teamService.getAllTeamsWithSquads();
+             for (Team t : teams) {
+@@ -130,6 +142,7 @@
+             teamStrategiesPanel.add(new JLabel("Failed to load bots: " + ex.getMessage()));
+         }
+ 
+-        add(teamStrategiesPanel, BorderLayout.CENTER);
++        teamStrategiesPanel.revalidate();
++        teamStrategiesPanel.repaint();
+     }
+ }
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/FinalSummaryPanel.java src/main/java/com/cricbid/ui/FinalSummaryPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/FinalSummaryPanel.java	2026-11-02 15:57:02
++++ src/main/java/com/cricbid/ui/FinalSummaryPanel.java	2026-11-02 15:42:12
+@@ -47,7 +47,6 @@
+         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+ 
+         initComponents();
+-        refreshSummary();
+     }
+ 
+     private void initComponents() {
+@@ -128,12 +127,15 @@
+                 String issues = ruleValidator.getRosterComplianceIssues(t);
+                 String compliance = issues.isEmpty() ? "COMPLIANT" : "VIOLATION: " + issues.replace("\n", " ");
+ 
++                int minSquad = RuleValidator.getActiveMinSquadSize();
++                int minBowlers = RuleValidator.getActiveMinBowlers();
++
+                 summaryModel.addRow(new Object[]{
+                         t.getName(),
+                         String.format("%.2f Cr", t.getPurseRemaining()),
+-                        t.getSquadSize() + "/25 (Min 18)",
++                        String.format("%d/25 (Min %d)", t.getSquadSize(), minSquad),
+                         t.getOverseasCount() + "/8",
+-                        t.getBowlerCount() + " (Min 5)",
++                        String.format("%d (Min %d)", t.getBowlerCount(), minBowlers),
+                         t.getWicketKeeperCount() + " (Min 1)",
+                         compliance
+                 });
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/LiveAuctionPanel.java src/main/java/com/cricbid/ui/LiveAuctionPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/LiveAuctionPanel.java	2026-11-02 15:59:24
++++ src/main/java/com/cricbid/ui/LiveAuctionPanel.java	2026-11-02 15:41:20
+@@ -1,12 +1,14 @@
+ package com.cricbid.ui;
+ 
++import com.cricbid.db.DBConnection;
+ import com.cricbid.exception.CricBidException;
+ import com.cricbid.model.Bid;
+ import com.cricbid.model.Player;
+-import com.cricbid.model.PlayerRole;
+-import com.cricbid.model.PlayerStatus;
+ import com.cricbid.model.Team;
+ import com.cricbid.model.User;
++import com.cricbid.network.AuctionClient;
++import com.cricbid.network.NetworkMessage;
++import com.cricbid.network.NetworkUtils;
+ import com.cricbid.observer.AuctionObserver;
+ import com.cricbid.service.AuctionService;
+ import com.cricbid.service.RuleValidator;
+@@ -15,8 +17,6 @@
+ import com.cricbid.ui.renderer.PlayerTableRenderer;
+ 
+ import javax.swing.BorderFactory;
+-import javax.swing.Box;
+-import javax.swing.BoxLayout;
+ import javax.swing.JButton;
+ import javax.swing.JFrame;
+ import javax.swing.JLabel;
+@@ -31,7 +31,6 @@
+ import javax.swing.JToggleButton;
+ import javax.swing.SpinnerNumberModel;
+ import javax.swing.SwingConstants;
+-import javax.swing.SwingUtilities;
+ import javax.swing.table.DefaultTableModel;
+ import java.awt.BorderLayout;
+ import java.awt.Color;
+@@ -42,7 +41,9 @@
+ import java.awt.GridBagLayout;
+ import java.awt.GridLayout;
+ import java.awt.Insets;
++import java.io.IOException;
+ import java.sql.SQLException;
++import java.util.ArrayList;
+ import java.util.List;
+ 
+ 
+@@ -52,6 +53,9 @@
+     private final TeamService teamService;
+     private final JFrame parentFrame;
+ 
++    private JPanel statusBannerPanel;
++    private JLabel statusBannerLabel;
++
+     private JLabel playerNameLabel;
+     private JLabel playerRoleLabel;
+     private JLabel playerRatingLabel;
+@@ -61,19 +65,31 @@
+     private JProgressBar countdownProgressBar;
+     private JLabel currentPriceLabel;
+     private JLabel leadingTeamLabel;
++    private JLabel userPurseTitleLabel;
+     private JLabel userPurseLabel;
++    private JLabel bidAmountTitleLabel;
+ 
+     private JSpinner bidSpinner;
++    private JPanel bidderBtnRow;
+     private JButton placeBidBtn;
+     private JButton passBtn;
+     private JButton autoSuggestBtn;
+ 
++    private JPanel adminControlRow;
++    private JButton adminPauseResumeBtn;
++    private JButton adminSkipBtn;
++    private JToggleButton botToggle;
++
+     private JTextArea bidLogTextArea;
+     private JTable upcomingPoolTable;
+     private DefaultTableModel upcomingPoolModel;
+ 
+     private Team humanTeam;
+     private User currentUser;
++    private AuctionClient auctionClient;
++    private Player activePlayer;
++    private int activeRoundDurationSec = 15;
++    private List<Player> syncedUpcomingPool = null;
+ 
+     public LiveAuctionPanel(JFrame parentFrame, AuctionService auctionService, TeamService teamService) {
+         this.parentFrame = parentFrame;
+@@ -86,13 +102,132 @@
+         this.auctionService.getAuctionSubject().addObserver(this);
+     }
+ 
+-    public void setSession(User user, Team team) {
++    public void setSession(User user, Team team, AuctionClient client) {
+         this.currentUser = user;
+         this.humanTeam = team;
++        this.auctionClient = client;
++
++        boolean isAdmin = user != null && user.isAdmin();
++
++        // Toggle Bidder controls vs Auctioneer controls
++        bidAmountTitleLabel.setVisible(!isAdmin);
++        bidSpinner.setVisible(!isAdmin);
++        bidderBtnRow.setVisible(!isAdmin);
++        adminControlRow.setVisible(isAdmin);
++
++        if (isAdmin) {
++            userPurseTitleLabel.setText("Session Role:");
++            userPurseLabel.setText("Auctioneer Host (Controls Start / Pause / Next)");
++            userPurseLabel.setForeground(new Color(20, 65, 140));
++            botToggle.setSelected(auctionService.isBotsEnabled());
++            updateBotToggleStyle(auctionService.isBotsEnabled());
++            updateHostBanner(null);
++        } else {
++            String teamTitle = (humanTeam != null) ? humanTeam.getName() : "Unassigned";
++            userPurseTitleLabel.setText("Your Purse (" + teamTitle + "):");
++            userPurseLabel.setForeground(new Color(25, 120, 40));
++            updateUserPurseDisplay();
++            if (client != null) {
++                updateClientBanner(client.isConnected(),
++                        "Connecting to Host " + client.getHost() + ":" + client.getPort() + "...");
++            }
++        }
++    }
++
++    public void updateHostBanner(List<String> connectedClients) {
++        if (currentUser == null || !currentUser.isAdmin()) return;
++        String lanIp = NetworkUtils.getLocalLanIp();
++        int port = DBConnection.getInstance().getServerPort();
++        String clientsInfo = (connectedClients == null || connectedClients.isEmpty())
++                ? "0 Laptops Connected (Waiting for owner1 / owner2)"
++                : connectedClients.size() + " Connected: " + String.join(", ", connectedClients);
++        statusBannerPanel.setBackground(new Color(228, 240, 255));
++        statusBannerLabel.setForeground(new Color(15, 55, 115));
++        statusBannerLabel.setText(String.format("🎙 AUCTIONEER HOST  |  Host IP: %s:%d  |  %s", lanIp, port, clientsInfo));
++    }
++
++    public void updateClientBanner(boolean connected, String statusMessage) {
++        if (currentUser != null && currentUser.isAdmin()) return;
++        String teamTitle = (humanTeam != null) ? humanTeam.getName() : "Spectator";
++        if (connected) {
++            statusBannerPanel.setBackground(new Color(225, 248, 230));
++            statusBannerLabel.setForeground(new Color(15, 105, 35));
++            statusBannerLabel.setText(String.format("🟢 %s  |  Bidding as Franchise: %s", statusMessage, teamTitle));
++        } else {
++            statusBannerPanel.setBackground(new Color(255, 244, 220));
++            statusBannerLabel.setForeground(new Color(165, 90, 10));
++            statusBannerLabel.setText(String.format("🟡 %s  |  Franchise: %s", statusMessage, teamTitle));
++        }
++    }
++
++    public void setSyncedUpcomingPool(List<Player> upcoming) {
++        this.syncedUpcomingPool = (upcoming != null) ? new ArrayList<>(upcoming) : new ArrayList<>();
++        refreshUpcomingPoolTable();
++    }
++
++    public void handleAuctionReset(boolean quickMode) {
++        RuleValidator.setQuickModeActive(quickMode);
++        bidLogTextArea.setText("");
++        logMessage(String.format("=== NEW AUCTION STARTED (%s Mode | Min Squad: %d) ===",
++                quickMode ? "Quick" : "Full", RuleValidator.getActiveMinSquadSize()));
+         updateUserPurseDisplay();
+     }
+ 
++    public void applySyncState(NetworkMessage sync) {
++        if (sync == null) return;
++        RuleValidator.setQuickModeActive(sync.isQuickMode());
++        if (sync.getUpcomingPool() != null) {
++            this.syncedUpcomingPool = new ArrayList<>(sync.getUpcomingPool());
++            refreshUpcomingPoolTable();
++        }
++        updateUserPurseDisplay();
++
++        Player p = sync.getPlayer();
++        if (!sync.isRunning() || p == null) {
++            playerNameLabel.setText("Waiting for Admin to start auction...");
++            leadingTeamLabel.setText("Connected — Standby for Round 1");
++            return;
++        }
++
++        this.activePlayer = p;
++        this.activeRoundDurationSec = Math.max(5, sync.getRoundDurationSec());
++        populatePlayerCard(p, sync.getAmount(), activeRoundDurationSec);
++        onTimerTick(sync.getSecondsRemaining());
++
++        if (sync.isRoundHasBids() && sync.getTeam() != null) {
++            Team lead = sync.getTeam();
++            leadingTeamLabel.setText(formatTeamBadge(lead));
++            double nextValid = RuleValidator.getNextValidBidAmount(sync.getAmount(), true);
++            bidSpinner.setValue(nextValid);
++        }
++        if (sync.isPaused()) {
++            logMessage("[SYNC] Joined live round (currently PAUSED).");
++        } else {
++            logMessage("[SYNC] Synced with live auction block: " + p.getName());
++        }
++    }
++
++    public void appendExternalLog(String message) {
++        logMessage(message);
++    }
++
++    public void showBidRejected(String reason) {
++        JOptionPane.showMessageDialog(this, reason, "Bid Rejected", JOptionPane.WARNING_MESSAGE);
++    }
++
+     private void initComponents() {
++        // Top status strip
++        statusBannerPanel = new JPanel(new BorderLayout());
++        statusBannerPanel.setBackground(new Color(235, 242, 250));
++        statusBannerPanel.setBorder(BorderFactory.createCompoundBorder(
++                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(200, 212, 228)),
++                BorderFactory.createEmptyBorder(6, 14, 6, 14)
++        ));
++        statusBannerLabel = new JLabel("Live Auction Room");
++        statusBannerLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
++        statusBannerPanel.add(statusBannerLabel, BorderLayout.CENTER);
++        add(statusBannerPanel, BorderLayout.NORTH);
++
+         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+         splitPane.setResizeWeight(0.55);
+         splitPane.setDividerLocation(520);
+@@ -179,10 +314,10 @@
+         timerTitle.setFont(new Font("SansSerif", Font.BOLD, 12));
+         timerPanel.add(timerTitle, BorderLayout.WEST);
+ 
+-        countdownProgressBar = new JProgressBar(0, 10);
+-        countdownProgressBar.setValue(10);
++        countdownProgressBar = new JProgressBar(0, 15);
++        countdownProgressBar.setValue(15);
+         countdownProgressBar.setStringPainted(true);
+-        countdownProgressBar.setString("10s");
++        countdownProgressBar.setString("15s");
+         countdownProgressBar.setForeground(new Color(40, 160, 60));
+         timerPanel.add(countdownProgressBar, BorderLayout.CENTER);
+         panel.add(timerPanel, BorderLayout.SOUTH);
+@@ -218,7 +353,8 @@
+         panel.add(leadingTeamLabel, gbc);
+ 
+         gbc.gridx = 0; gbc.gridy = 2;
+-        panel.add(new JLabel("Your Remaining Purse:"), gbc);
++        userPurseTitleLabel = new JLabel("Your Remaining Purse:");
++        panel.add(userPurseTitleLabel, gbc);
+ 
+         gbc.gridx = 1;
+         userPurseLabel = new JLabel("100.00 Cr");
+@@ -227,69 +363,101 @@
+         panel.add(userPurseLabel, gbc);
+ 
+         gbc.gridx = 0; gbc.gridy = 3;
+-        panel.add(new JLabel("Your Bid Amount (Cr):"), gbc);
++        bidAmountTitleLabel = new JLabel("Your Bid Amount (Cr):");
++        panel.add(bidAmountTitleLabel, gbc);
+ 
+         gbc.gridx = 1;
+         bidSpinner = new JSpinner(new SpinnerNumberModel(1.0, 0.20, 100.0, 0.25));
+         bidSpinner.setPreferredSize(new Dimension(140, 30));
+         panel.add(bidSpinner, gbc);
+ 
++        // Team Owner bidding buttons row
+         gbc.gridx = 0; gbc.gridy = 4;
+         gbc.gridwidth = 2;
+-        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 4));
+-        btnRow.setOpaque(false);
++        bidderBtnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 4));
++        bidderBtnRow.setOpaque(false);
+ 
+         placeBidBtn = new JButton("Place Bid");
+         placeBidBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
+         placeBidBtn.setBackground(new Color(30, 90, 180));
+         placeBidBtn.setForeground(Color.BLACK);
+         placeBidBtn.addActionListener(e -> handlePlaceHumanBid());
+-        btnRow.add(placeBidBtn);
++        bidderBtnRow.add(placeBidBtn);
+ 
+         passBtn = new JButton("Pass");
+-        passBtn.addActionListener(e -> logMessage("You passed on the current player."));
+-        btnRow.add(passBtn);
++        passBtn.addActionListener(e -> handlePass());
++        bidderBtnRow.add(passBtn);
+ 
+         autoSuggestBtn = new JButton("Auto-Suggest Bid");
+         autoSuggestBtn.setToolTipText("Calculates an optimal max valuation for this player based on rating and purse");
+         autoSuggestBtn.addActionListener(e -> handleAutoSuggest());
+-        btnRow.add(autoSuggestBtn);
++        bidderBtnRow.add(autoSuggestBtn);
+ 
+-        panel.add(btnRow, gbc);
++        panel.add(bidderBtnRow, gbc);
+ 
++        // Admin Auctioneer control row (shown only to ADMIN on Laptop 1)
+         gbc.gridx = 0; gbc.gridy = 5;
+         gbc.gridwidth = 2;
+-        JPanel botRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 4));
+-        botRow.setOpaque(false);
++        adminControlRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 4));
++        adminControlRow.setOpaque(false);
+ 
+-        JToggleButton botToggle = new JToggleButton("🤖 AI Bots: ON  (Click to Disable)");
+-        botToggle.setSelected(true);
++        adminPauseResumeBtn = new JButton("Pause / Resume Round");
++        adminPauseResumeBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
++        adminPauseResumeBtn.addActionListener(e -> {
++            if (auctionService.isPaused()) {
++                auctionService.resumeAuction();
++            } else {
++                auctionService.pauseAuction();
++            }
++        });
++        adminControlRow.add(adminPauseResumeBtn);
++
++        adminSkipBtn = new JButton("Skip / Next Player");
++        adminSkipBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
++        adminSkipBtn.addActionListener(e -> auctionService.presentNextPlayer());
++        adminControlRow.add(adminSkipBtn);
++
++        botToggle = new JToggleButton("🤖 AI Bots: OFF (Click to Enable)", false);
+         botToggle.setFont(new Font("SansSerif", Font.BOLD, 12));
+-        botToggle.setBackground(new Color(220, 255, 220));
+-        botToggle.setForeground(new Color(20, 120, 20));
+-        botToggle.setPreferredSize(new Dimension(280, 34));
++        botToggle.setPreferredSize(new Dimension(240, 32));
++        updateBotToggleStyle(false);
+         botToggle.addActionListener(e -> {
+             boolean on = botToggle.isSelected();
+             auctionService.setBotsEnabled(on);
+-            botToggle.setText(on ? "🤖 AI Bots: ON  (Click to Disable)" : "🤖 AI Bots: OFF  (Click to Enable)");
+-            botToggle.setBackground(on ? new Color(220, 255, 220) : new Color(255, 230, 230));
+-            botToggle.setForeground(on ? new Color(20, 120, 20) : new Color(160, 20, 20));
++            updateBotToggleStyle(on);
+         });
+-        botRow.add(botToggle);
+-        panel.add(botRow, gbc);
++        adminControlRow.add(botToggle);
++        adminControlRow.setVisible(false);
+ 
++        panel.add(adminControlRow, gbc);
++
+         return panel;
+     }
+ 
++    private void updateBotToggleStyle(boolean on) {
++        botToggle.setText(on ? "🤖 AI Bots: ON (Click to Disable)" : "🤖 AI Bots: OFF (Human-Only)");
++        botToggle.setBackground(on ? new Color(220, 255, 220) : new Color(242, 244, 248));
++        botToggle.setForeground(on ? new Color(20, 120, 20) : new Color(90, 95, 105));
++    }
++
+     private void handlePlaceHumanBid() {
+         if (humanTeam == null) {
+-            JOptionPane.showMessageDialog(this, "No human team selected.", "Error", JOptionPane.ERROR_MESSAGE);
++            JOptionPane.showMessageDialog(this, "No human team associated with this account.", "Error", JOptionPane.ERROR_MESSAGE);
+             return;
+         }
+ 
+         double bidAmount = ((Double) bidSpinner.getValue());
++        if (auctionClient != null) {
++            try {
++                auctionClient.sendBid(humanTeam.getTeamId(), bidAmount);
++            } catch (IOException ex) {
++                JOptionPane.showMessageDialog(this, ex.getMessage(), "Network Error", JOptionPane.WARNING_MESSAGE);
++            }
++            return;
++        }
++
+         try {
+-            auctionService.placeBid(humanTeam, bidAmount);
++            auctionService.placeHumanBid(humanTeam, bidAmount);
+             updateUserPurseDisplay();
+         } catch (CricBidException ex) {
+             JOptionPane.showMessageDialog(this, ex.getMessage(), "Bid Rejected", JOptionPane.WARNING_MESSAGE);
+@@ -298,12 +466,22 @@
+         }
+     }
+ 
++    private void handlePass() {
++        if (auctionClient != null && humanTeam != null) {
++            auctionClient.sendPass(humanTeam.getName());
++        } else {
++            logMessage("You passed on the current player.");
++        }
++    }
++
+     private void handleAutoSuggest() {
+-        if (humanTeam == null || auctionService.getCurrentPlayer() == null) return;
+-        double suggestion = auctionService.suggestBidForHuman(humanTeam);
++        Player target = (activePlayer != null) ? activePlayer : auctionService.getCurrentPlayer();
++        if (humanTeam == null || target == null) return;
++        updateUserPurseDisplay();
++        double suggestion = auctionService.suggestBidForPlayer(humanTeam, target);
+         JOptionPane.showMessageDialog(this,
+-                String.format("AI Suggestion for %s:\nMax Recommended Bid: %.2f Cr\n(Derived from rating %d, squad needs, and reserve requirements)",
+-                        auctionService.getCurrentPlayer().getName(), suggestion, auctionService.getCurrentPlayer().getRating()),
++                String.format("AI Suggestion for %s:\nMax Recommended Bid: %.2f Cr\n(Derived from rating %d, squad needs, and min squad %d reserve rule)",
++                        target.getName(), suggestion, target.getRating(), RuleValidator.getActiveMinSquadSize()),
+                 "Auto-Suggest Bid", JOptionPane.INFORMATION_MESSAGE);
+     }
+ 
+@@ -315,11 +493,39 @@
+                 if (t != null) {
+                     humanTeam.setPurseRemaining(t.getPurseRemaining());
+                 }
+-                userPurseLabel.setText(String.format("%.2f Cr", humanTeam.getPurseRemaining()));
++                userPurseLabel.setText(String.format("%.2f Cr  (Squad: %d/25)",
++                        humanTeam.getPurseRemaining(), humanTeam.getSquadSize()));
+             } catch (SQLException ignored) {}
+         }
+     }
+ 
++    private String formatTeamBadge(Team team) {
++        if (team == null) return "None";
++        if (humanTeam != null && team.getTeamId() == humanTeam.getTeamId()) {
++            return team.getName() + " [You]";
++        }
++        return team.getName() + (team.isHuman() ? " [Participant]" : " [Bot]");
++    }
++
++    private void populatePlayerCard(Player player, double currentPrice, int roundDurationSec) {
++        playerNameLabel.setText(player.getName() + (player.isOverseas() ? " (Overseas)" : ""));
++        playerRoleLabel.setText("Role: " + player.getRole().getDisplayName());
++        playerRatingLabel.setText("Rating: " + player.getRating() + "/100");
++        playerBasePriceLabel.setText(String.format("Base: %.2f Cr", player.getBasePrice()));
++        playerStatsArea.setText(player.describe() + "\nValuation: ~" + String.format("%.2f", player.calculateValue()) + " Cr");
++
++        currentPriceLabel.setText(String.format("%.2f Cr", currentPrice));
++        leadingTeamLabel.setText("None (Awaiting Bids)");
++
++        countdownProgressBar.setMaximum(roundDurationSec);
++        countdownProgressBar.setValue(roundDurationSec);
++        countdownProgressBar.setString(roundDurationSec + "s");
++        countdownProgressBar.setForeground(new Color(40, 160, 60));
++
++        double nextBid = RuleValidator.getNextValidBidAmount(currentPrice, false);
++        bidSpinner.setValue(nextBid);
++    }
++
+     private void logMessage(String message) {
+         bidLogTextArea.append(message + "\n");
+         bidLogTextArea.setCaretPosition(bidLogTextArea.getDocument().getLength());
+@@ -327,10 +533,17 @@
+ 
+     public void refreshUpcomingPoolTable() {
+         upcomingPoolModel.setRowCount(0);
+-        List<Player> pool = auctionService.getAuctionPool();
+-        int currentIndex = auctionService.getCurrentPoolIndex();
++        List<Player> pool;
++        int startIndex = 0;
+ 
+-        for (int i = currentIndex; i < pool.size(); i++) {
++        if (auctionClient != null && syncedUpcomingPool != null) {
++            pool = syncedUpcomingPool;
++        } else {
++            pool = auctionService.getAuctionPool();
++            startIndex = auctionService.getCurrentPoolIndex();
++        }
++
++        for (int i = startIndex; i < pool.size(); i++) {
+             Player p = pool.get(i);
+             upcomingPoolModel.addRow(new Object[]{
+                     p.getPlayerId(),
+@@ -345,23 +558,10 @@
+ 
+     @Override
+     public void onPlayerUpForAuction(Player player, double currentPrice, int roundDurationSec) {
+-        playerNameLabel.setText(player.getName() + (player.isOverseas() ? " (Overseas)" : ""));
+-        playerRoleLabel.setText("Role: " + player.getRole().getDisplayName());
+-        playerRatingLabel.setText("Rating: " + player.getRating() + "/100");
+-        playerBasePriceLabel.setText(String.format("Base: %.2f Cr", player.getBasePrice()));
+-        playerStatsArea.setText(player.describe() + "\nValuation: ~" + String.format("%.2f", player.calculateValue()) + " Cr");
++        this.activePlayer = player;
++        this.activeRoundDurationSec = roundDurationSec;
++        populatePlayerCard(player, currentPrice, roundDurationSec);
+ 
+-        currentPriceLabel.setText(String.format("%.2f Cr", currentPrice));
+-        leadingTeamLabel.setText("None (Awaiting Bids)");
+-
+-        countdownProgressBar.setMaximum(roundDurationSec);
+-        countdownProgressBar.setValue(roundDurationSec);
+-        countdownProgressBar.setString(roundDurationSec + "s");
+-        countdownProgressBar.setForeground(new Color(40, 160, 60));
+-
+-        double nextBid = RuleValidator.getNextValidBidAmount(currentPrice, false);
+-        bidSpinner.setValue(nextBid);
+-
+         logMessage(String.format(">>> UP FOR AUCTION: %s (%s) | Base: %.2f Cr",
+                 player.getName(), player.getRole().getDisplayName(), player.getBasePrice()));
+ 
+@@ -371,8 +571,13 @@
+     @Override
+     public void onBidPlaced(Bid bid, Team team, Player player) {
+         currentPriceLabel.setText(String.format("%.2f Cr", bid.getAmount()));
+-        leadingTeamLabel.setText(team.getName() + (team.isHuman() ? " [You]" : " [Bot]"));
++        leadingTeamLabel.setText(formatTeamBadge(team));
+ 
++        // Reset visual timer bar immediately when a bid resets the countdown
++        countdownProgressBar.setValue(activeRoundDurationSec);
++        countdownProgressBar.setString(activeRoundDurationSec + "s");
++        countdownProgressBar.setForeground(new Color(40, 160, 60));
++
+         boolean userIsTyping = bidSpinner.hasFocus() ||
+                 (bidSpinner.getEditor() != null && bidSpinner.getEditor().hasFocus());
+         if (!userIsTyping) {
+@@ -392,7 +597,10 @@
+         SoldPopupDialog dialog = new SoldPopupDialog(parentFrame, player, team, finalPrice, true);
+         dialog.setVisible(true);
+ 
+-        auctionService.presentNextPlayer();
++        // Only the Host (non-client) advances the auction engine to the next player
++        if (auctionClient == null) {
++            auctionService.presentNextPlayer();
++        }
+     }
+ 
+     @Override
+@@ -402,7 +610,9 @@
+         SoldPopupDialog dialog = new SoldPopupDialog(parentFrame, player, null, 0.0, false);
+         dialog.setVisible(true);
+ 
+-        auctionService.presentNextPlayer();
++        if (auctionClient == null) {
++            auctionService.presentNextPlayer();
++        }
+     }
+ 
+     @Override
+@@ -421,11 +631,12 @@
+ 
+     @Override
+     public void onAuctionPaused(boolean isPaused) {
+-        logMessage(isPaused ? "[AUCTION PAUSED]" : "[AUCTION RESUMED]");
++        logMessage(isPaused ? "[AUCTION PAUSED BY HOST]" : "[AUCTION RESUMED BY HOST]");
+     }
+ 
+     @Override
+     public void onAuctionCompleted() {
++        this.activePlayer = null;
+         logMessage("\n======================================");
+         logMessage("AUCTION TOURNAMENT COMPLETED!");
+         logMessage("======================================\n");
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/LoginPanel.java src/main/java/com/cricbid/ui/LoginPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/LoginPanel.java	2026-11-02 15:59:19
++++ src/main/java/com/cricbid/ui/LoginPanel.java	2026-11-02 15:41:15
+@@ -1,7 +1,9 @@
+ package com.cricbid.ui;
+ 
++import com.cricbid.db.DBConnection;
+ import com.cricbid.exception.AuthenticationException;
+ import com.cricbid.model.User;
++import com.cricbid.network.NetworkUtils;
+ import com.cricbid.service.AuthService;
+ 
+ import javax.swing.BorderFactory;
+@@ -16,25 +18,27 @@
+ import java.awt.BorderLayout;
+ import java.awt.Color;
+ import java.awt.Dimension;
++import java.awt.FlowLayout;
+ import java.awt.Font;
+ import java.awt.GridBagConstraints;
+ import java.awt.GridBagLayout;
+ import java.awt.Insets;
+ import java.sql.SQLException;
+-import java.util.function.Consumer;
++import java.util.function.BiConsumer;
+ 
+ 
+ public class LoginPanel extends JPanel {
+ 
+     private final AuthService authService;
+-    private final Consumer<User> onLoginSuccess;
++    private final BiConsumer<User, String> onLoginSuccess;
+ 
++    private JTextField hostIpField;
+     private JTextField usernameField;
+     private JPasswordField passwordField;
+     private JCheckBox showPasswordCheckBox;
+     private JButton loginButton;
+ 
+-    public LoginPanel(AuthService authService, Consumer<User> onLoginSuccess) {
++    public LoginPanel(AuthService authService, BiConsumer<User, String> onLoginSuccess) {
+         this.authService = authService;
+         this.onLoginSuccess = onLoginSuccess;
+         setLayout(new BorderLayout());
+@@ -48,20 +52,23 @@
+         centerCard.setBackground(Color.WHITE);
+         centerCard.setBorder(BorderFactory.createCompoundBorder(
+                 BorderFactory.createLineBorder(new Color(220, 226, 235), 1),
+-                BorderFactory.createEmptyBorder(30, 40, 30, 40)
++                BorderFactory.createEmptyBorder(26, 36, 26, 36)
+         ));
+ 
+         GridBagConstraints gbc = new GridBagConstraints();
+-        gbc.insets = new Insets(8, 8, 8, 8);
++        gbc.insets = new Insets(6, 8, 6, 8);
+         gbc.fill = GridBagConstraints.HORIZONTAL;
+ 
+-        JLabel titleLabel = new JLabel("CricBid Auction System", SwingConstants.CENTER);
+-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
++        JLabel titleLabel = new JLabel("CricBid Multi-Laptop Auction System", SwingConstants.CENTER);
++        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 21));
+         titleLabel.setForeground(new Color(25, 45, 85));
+ 
+-        JLabel subtitleLabel = new JLabel("Sign in with admin or owner credentials", SwingConstants.CENTER);
++        String detectedLanIp = NetworkUtils.getLocalLanIp();
++        JLabel subtitleLabel = new JLabel(
++                "This Laptop's LAN IP: " + detectedLanIp + "   (Host uses 'localhost'; Participants enter Host IP)",
++                SwingConstants.CENTER);
+         subtitleLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+-        subtitleLabel.setForeground(Color.GRAY);
++        subtitleLabel.setForeground(new Color(35, 95, 155));
+ 
+         gbc.gridx = 0;
+         gbc.gridy = 0;
+@@ -71,30 +78,46 @@
+         gbc.gridy = 1;
+         centerCard.add(subtitleLabel, gbc);
+ 
++        // Host Server IP field
+         gbc.gridwidth = 1;
+         gbc.gridy = 2;
+         gbc.gridx = 0;
++        JLabel hostLabel = new JLabel("Host Laptop IP:");
++        hostLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
++        centerCard.add(hostLabel, gbc);
++
++        gbc.gridx = 1;
++        hostIpField = new JTextField(DBConnection.getInstance().getHost(), 16);
++        hostIpField.setPreferredSize(new Dimension(220, 30));
++        hostIpField.setToolTipText("Keep 'localhost' on Laptop 1 (Admin Host). On Laptops 2 & 3, type Laptop 1's Wi-Fi/Hotspot IP.");
++        centerCard.add(hostIpField, gbc);
++
++        // Username field
++        gbc.gridy = 3;
++        gbc.gridx = 0;
+         JLabel userLabel = new JLabel("Username:");
+         userLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+         centerCard.add(userLabel, gbc);
+ 
+         gbc.gridx = 1;
+-        usernameField = new JTextField("owner1", 15);
+-        usernameField.setPreferredSize(new Dimension(200, 30));
++        usernameField = new JTextField("admin", 16);
++        usernameField.setPreferredSize(new Dimension(220, 30));
+         centerCard.add(usernameField, gbc);
+ 
+-        gbc.gridy = 3;
++        // Password field
++        gbc.gridy = 4;
+         gbc.gridx = 0;
+         JLabel passLabel = new JLabel("Password:");
+         passLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+         centerCard.add(passLabel, gbc);
+ 
+         gbc.gridx = 1;
+-        passwordField = new JPasswordField("owner123", 15);
+-        passwordField.setPreferredSize(new Dimension(200, 30));
++        passwordField = new JPasswordField("admin123", 16);
++        passwordField.setPreferredSize(new Dimension(220, 30));
+         centerCard.add(passwordField, gbc);
+ 
+-        gbc.gridy = 4;
++        // Show password checkbox
++        gbc.gridy = 5;
+         gbc.gridx = 1;
+         showPasswordCheckBox = new JCheckBox("Show password");
+         showPasswordCheckBox.setBackground(Color.WHITE);
+@@ -107,19 +130,49 @@
+         });
+         centerCard.add(showPasswordCheckBox, gbc);
+ 
+-        gbc.gridy = 5;
++        // Quick-fill role preset bar for 3-laptop setup
++        gbc.gridy = 6;
+         gbc.gridx = 0;
+         gbc.gridwidth = 2;
+-        loginButton = new JButton("Login to Auction");
++        JPanel presetPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 2));
++        presetPanel.setOpaque(false);
++        presetPanel.add(new JLabel("Quick Fill:"));
++
++        JButton adminPreset = createPresetButton("Laptop 1: Admin", () -> {
++            hostIpField.setText("localhost");
++            usernameField.setText("admin");
++            passwordField.setText("admin123");
++        });
++        JButton owner1Preset = createPresetButton("Laptop 2: owner1", () -> {
++            usernameField.setText("owner1");
++            passwordField.setText("owner123");
++        });
++        JButton owner2Preset = createPresetButton("Laptop 3: owner2", () -> {
++            usernameField.setText("owner2");
++            passwordField.setText("owner123");
++        });
++        presetPanel.add(adminPreset);
++        presetPanel.add(owner1Preset);
++        presetPanel.add(owner2Preset);
++        centerCard.add(presetPanel, gbc);
++
++        // Login button
++        gbc.gridy = 7;
++        gbc.gridx = 0;
++        gbc.gridwidth = 2;
++        loginButton = new JButton("Connect & Login to Auction");
+         loginButton.setFont(new Font("SansSerif", Font.BOLD, 14));
+         loginButton.setBackground(new Color(30, 60, 120));
+         loginButton.setForeground(Color.BLACK);
+-        loginButton.setPreferredSize(new Dimension(200, 36));
++        loginButton.setPreferredSize(new Dimension(220, 38));
+         loginButton.addActionListener(e -> handleLogin());
+         centerCard.add(loginButton, gbc);
+ 
+-        gbc.gridy = 6;
+-        JLabel hintLabel = new JLabel("Demo Logins: admin/admin123  |  owner1/owner123", SwingConstants.CENTER);
++        // Credentials hint
++        gbc.gridy = 8;
++        JLabel hintLabel = new JLabel(
++                "Logins: admin/admin123 (Host)  |  owner1/owner123 (Thunder Hawks)  |  owner2/owner123 (Iron Wolves)",
++                SwingConstants.CENTER);
+         hintLabel.setFont(new Font("SansSerif", Font.ITALIC, 11));
+         hintLabel.setForeground(new Color(100, 110, 130));
+         centerCard.add(hintLabel, gbc);
+@@ -130,14 +183,29 @@
+         add(outer, BorderLayout.CENTER);
+     }
+ 
++    private JButton createPresetButton(String label, Runnable action) {
++        JButton btn = new JButton(label);
++        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
++        btn.setFocusPainted(false);
++        btn.addActionListener(e -> action.run());
++        return btn;
++    }
++
+     private void handleLogin() {
++        String hostIp = hostIpField.getText().trim();
++        if (hostIp.isEmpty()) {
++            hostIp = "localhost";
++            hostIpField.setText(hostIp);
++        }
+         String username = usernameField.getText().trim();
+         String password = new String(passwordField.getPassword());
+ 
++        DBConnection.getInstance().configureHost(hostIp);
++
+         try {
+             User user = authService.login(username, password);
+             if (onLoginSuccess != null) {
+-                onLoginSuccess.accept(user);
++                onLoginSuccess.accept(user, hostIp);
+             }
+         } catch (AuthenticationException ex) {
+             JOptionPane.showMessageDialog(this,
+@@ -146,9 +214,16 @@
+                     JOptionPane.ERROR_MESSAGE);
+         } catch (SQLException ex) {
+             JOptionPane.showMessageDialog(this,
+-                    "Database connection error: " + ex.getMessage() +
+-                    "\nPlease ensure MySQL is running with database 'cricbid'.",
+-                    "Database Error",
++                    "Could not connect to MySQL on Host '" + hostIp + ":3306'.\n\n" +
++                    "Details: " + ex.getMessage() + "\n\n" +
++                    "Multi-Laptop Checklist:\n" +
++                    "1. Connect all 3 laptops to the same Phone Hotspot / Wi-Fi.\n" +
++                    "2. On Laptop 1 (Host), ensure MySQL is running and run:\n" +
++                    "     mysql -u root -p < schema.sql\n" +
++                    "     mysql -u root -p < seed.sql\n" +
++                    "     mysql -u root -p < lan_setup.sql\n" +
++                    "3. Verify Laptop 1's LAN IP matches '" + hostIp + "'.",
++                    "Database Connection Error",
+                     JOptionPane.ERROR_MESSAGE);
+         }
+     }
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/MainFrame.java src/main/java/com/cricbid/ui/MainFrame.java
+--- review1_backup/src/main/java/com/cricbid/ui/MainFrame.java	2026-11-02 15:59:28
++++ src/main/java/com/cricbid/ui/MainFrame.java	2026-11-02 15:43:08
+@@ -1,7 +1,11 @@
+ package com.cricbid.ui;
+ 
++import com.cricbid.db.DBConnection;
+ import com.cricbid.model.Team;
+ import com.cricbid.model.User;
++import com.cricbid.network.AuctionClient;
++import com.cricbid.network.AuctionServer;
++import com.cricbid.network.NetworkUtils;
+ import com.cricbid.observer.AuctionSubject;
+ import com.cricbid.service.AuctionService;
+ import com.cricbid.service.AuthService;
+@@ -24,17 +28,16 @@
+ import javax.swing.JSeparator;
+ import javax.swing.JToolBar;
+ import javax.swing.KeyStroke;
+-import javax.swing.SwingUtilities;
+ import java.awt.BorderLayout;
+ import java.awt.CardLayout;
+ import java.awt.Color;
+ import java.awt.Dimension;
+ import java.awt.Font;
+-import java.awt.event.ActionEvent;
+ import java.awt.event.InputEvent;
+ import java.awt.event.KeyEvent;
+ import java.awt.event.WindowAdapter;
+ import java.awt.event.WindowEvent;
++import java.io.IOException;
+ import java.sql.SQLException;
+ 
+ 
+@@ -61,6 +64,16 @@
+     private final JPanel cardsPanel;
+     private JToolBar mainToolBar;
+ 
++    private JMenuItem newAuctionItem;
++    private JMenu auctionMenu;
++    private JCheckBoxMenuItem toggleBotsItem;
++    private JRadioButtonMenuItem botViewMenuItem;
++
++    private JButton liveRoomBtn;
++    private JButton startBtn;
++    private JButton pauseBtn;
++    private JButton nextBtn;
++
+     private LoginPanel loginPanel;
+     private SetupPanel setupPanel;
+     private LiveAuctionPanel liveAuctionPanel;
+@@ -73,6 +86,8 @@
+ 
+     private User currentUser;
+     private Team currentHumanTeam;
++    private AuctionServer auctionServer;
++    private AuctionClient auctionClient;
+ 
+     public MainFrame() {
+         super("CricBid: Live Cricket Player Auction System");
+@@ -94,6 +109,7 @@
+         initScreens();
+         initMenuBar();
+         initToolBar();
++        setToolbarAndMenusForSession(false, false);
+ 
+         add(mainToolBar, BorderLayout.NORTH);
+         add(cardsPanel, BorderLayout.CENTER);
+@@ -136,11 +152,15 @@
+         JMenu fileMenu = new JMenu("File");
+         fileMenu.setMnemonic(KeyEvent.VK_F);
+ 
+-        JMenuItem newAuctionItem = new JMenuItem("New Auction Setup", KeyEvent.VK_N);
++        newAuctionItem = new JMenuItem("New Auction Setup", KeyEvent.VK_N);
+         newAuctionItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK));
+         newAuctionItem.addActionListener(e -> showCard(CARD_SETUP));
+         fileMenu.add(newAuctionItem);
+ 
++        JMenuItem logoutItem = new JMenuItem("Switch Account / Disconnect");
++        logoutItem.addActionListener(e -> handleLogout());
++        fileMenu.add(logoutItem);
++
+         JMenuItem customizeColorItem = new JMenuItem("Choose Theme Accent Color (JColorChooser)");
+         customizeColorItem.addActionListener(e -> {
+             Color chosen = JColorChooser.showDialog(this, "Select Application Theme Accent", new Color(30, 60, 120));
+@@ -159,10 +179,10 @@
+ 
+         menuBar.add(fileMenu);
+ 
+-        JMenu auctionMenu = new JMenu("Auction");
++        auctionMenu = new JMenu("Auction");
+         auctionMenu.setMnemonic(KeyEvent.VK_A);
+ 
+-        JMenuItem startItem = new JMenuItem("Start Live Round");
++        JMenuItem startItem = new JMenuItem("Start / Resume Live Round");
+         startItem.addActionListener(e -> auctionService.resumeAuction());
+         auctionMenu.add(startItem);
+ 
+@@ -178,7 +198,7 @@
+ 
+         auctionMenu.add(new JSeparator());
+ 
+-        JCheckBoxMenuItem toggleBotsItem = new JCheckBoxMenuItem("Enable Automated AI Bots", true);
++        toggleBotsItem = new JCheckBoxMenuItem("Enable Automated AI Bots", false);
+         toggleBotsItem.addActionListener(e -> auctionService.setBotsEnabled(toggleBotsItem.isSelected()));
+         auctionMenu.add(toggleBotsItem);
+ 
+@@ -194,6 +214,9 @@
+         for (int i = 0; i < viewNames.length; i++) {
+             final String targetCard = cardKeys[i];
+             JRadioButtonMenuItem rBtn = new JRadioButtonMenuItem(viewNames[i], i == 0);
++            if (CARD_BOTS.equals(targetCard)) {
++                botViewMenuItem = rBtn;
++            }
+             viewGroup.add(rBtn);
+             rBtn.addActionListener(e -> showCard(targetCard));
+             viewMenu.add(rBtn);
+@@ -222,40 +245,24 @@
+         mainToolBar.setFloatable(false);
+         mainToolBar.setBackground(new Color(238, 242, 248));
+ 
+-        JButton startBtn = createToolBarButton("Start / Resume", "Resume countdown and AI bot decisions", e -> {
++        liveRoomBtn = createToolBarButton("Live Auction", "Return to the live bidding block", e -> showCard(CARD_LIVE));
++
++        startBtn = createToolBarButton("Start / Resume", "Resume countdown (Admin Host only)", e -> {
+             showCard(CARD_LIVE);
+             auctionService.resumeAuction();
+         });
+ 
+-        JButton pauseBtn = createToolBarButton("Pause", "Halt the live countdown timer", e -> auctionService.pauseAuction());
++        pauseBtn = createToolBarButton("Pause", "Halt the live countdown timer (Admin Host only)", e -> auctionService.pauseAuction());
+ 
+-        JButton nextBtn = createToolBarButton("Next Player", "Skip to next available auction player", e -> auctionService.presentNextPlayer());
++        nextBtn = createToolBarButton("Next Player", "Skip to next available auction player (Admin Host only)", e -> auctionService.presentNextPlayer());
+ 
+-        JButton poolBtn = createToolBarButton("Player Pool", "Search and inspect all cricket players", e -> {
+-            playerPoolPanel.refreshPlayers();
+-            showCard(CARD_POOL);
+-        });
++        JButton poolBtn = createToolBarButton("Player Pool", "Search and inspect all cricket players", e -> showCard(CARD_POOL));
++        JButton teamsBtn = createToolBarButton("Teams & Squads", "View franchise rosters and budget charts", e -> showCard(CARD_TEAMS));
++        JButton tradeBtn = createToolBarButton("Trade Desk", "Swap players between two teams", e -> showCard(CARD_TRADE));
++        JButton reportsBtn = createToolBarButton("Reports & Charts", "View spending bar chart, pie chart and CSV export", e -> showCard(CARD_REPORTS));
++        JButton summaryBtn = createToolBarButton("Final Summary", "Audit rules compliance and view top buys", e -> showCard(CARD_SUMMARY));
+ 
+-        JButton teamsBtn = createToolBarButton("Teams & Squads", "View franchise rosters and budget charts", e -> {
+-            teamsPanel.refreshTeams();
+-            showCard(CARD_TEAMS);
+-        });
+-
+-        JButton tradeBtn = createToolBarButton("Trade Desk", "Swap players between two teams", e -> {
+-            tradeWindowPanel.loadTeams();
+-            showCard(CARD_TRADE);
+-        });
+-
+-        JButton reportsBtn = createToolBarButton("Reports & Charts", "View spending bar chart, pie chart and CSV export", e -> {
+-            reportsPanel.refreshReports();
+-            showCard(CARD_REPORTS);
+-        });
+-
+-        JButton summaryBtn = createToolBarButton("Final Summary", "Audit rules compliance and view top buys", e -> {
+-            summaryPanel.refreshSummary();
+-            showCard(CARD_SUMMARY);
+-        });
+-
++        mainToolBar.add(liveRoomBtn);
+         mainToolBar.add(startBtn);
+         mainToolBar.add(pauseBtn);
+         mainToolBar.add(nextBtn);
+@@ -276,34 +283,149 @@
+         return btn;
+     }
+ 
++    private void setToolbarAndMenusForSession(boolean loggedIn, boolean isAdmin) {
++        mainToolBar.setVisible(loggedIn);
++        newAuctionItem.setEnabled(loggedIn && isAdmin);
++        auctionMenu.setEnabled(loggedIn && isAdmin);
++        if (botViewMenuItem != null) {
++            botViewMenuItem.setEnabled(loggedIn && isAdmin);
++        }
++        startBtn.setVisible(isAdmin);
++        pauseBtn.setVisible(isAdmin);
++        nextBtn.setVisible(isAdmin);
++    }
++
+     public void showCard(String cardName) {
++        if (currentUser != null) {
++            switch (cardName) {
++                case CARD_POOL:
++                    playerPoolPanel.refreshPlayers();
++                    break;
++                case CARD_TEAMS:
++                    teamsPanel.refreshTeams();
++                    break;
++                case CARD_BOTS:
++                    botControlPanel.refreshBots();
++                    break;
++                case CARD_TRADE:
++                    tradeWindowPanel.loadTeams();
++                    break;
++                case CARD_REPORTS:
++                    reportsPanel.refreshReports();
++                    break;
++                case CARD_SUMMARY:
++                    summaryPanel.refreshSummary();
++                    break;
++                default:
++                    break;
++            }
++        }
+         cardLayout.show(cardsPanel, cardName);
+     }
+ 
+-    private void onLoginSuccess(User user) {
++    private void onLoginSuccess(User user, String hostIp) {
++        stopNetworking();
+         this.currentUser = user;
+-        setupPanel.initUserSession(user);
+-        showCard(CARD_SETUP);
++        boolean isAdmin = user.isAdmin();
++        setToolbarAndMenusForSession(true, isAdmin);
++
++        int serverPort = DBConnection.getInstance().getServerPort();
++
++        if (isAdmin) {
++            this.currentHumanTeam = null;
++            this.auctionServer = new AuctionServer(serverPort, auctionService, teamService);
++            this.auctionServer.setClientListListener(clients -> {
++                setupPanel.updateConnectedClients(clients);
++                liveAuctionPanel.updateHostBanner(clients);
++            });
++            this.auctionServer.setActivityLogListener(liveAuctionPanel::appendExternalLog);
++
++            try {
++                this.auctionServer.start();
++            } catch (IOException ex) {
++                JOptionPane.showMessageDialog(this,
++                        "Could not start Host Socket Server on TCP port " + serverPort + ":\n" + ex.getMessage() +
++                        "\n\nMake sure another Admin Host window isn't already running on this laptop.",
++                        "Host Server Port Busy", JOptionPane.WARNING_MESSAGE);
++            }
++
++            setTitle(String.format("CricBid [AUCTIONEER HOST] — %s  |  LAN IP: %s:%d",
++                    user.getUsername(), NetworkUtils.getLocalLanIp(), serverPort));
++            setupPanel.initUserSession(user);
++            showCard(CARD_SETUP);
++        } else {
++            try {
++                int teamId = (user.getTeamId() != null) ? user.getTeamId() : 1;
++                this.currentHumanTeam = teamService.getTeamById(teamId);
++            } catch (SQLException ignored) {}
++
++            String teamName = (currentHumanTeam != null) ? currentHumanTeam.getName() : "Franchise";
++            Integer teamId = (currentHumanTeam != null) ? currentHumanTeam.getTeamId() : user.getTeamId();
++
++            this.auctionClient = new AuctionClient(hostIp, serverPort, user.getUsername(), teamId, teamName, auctionSubject);
++            this.auctionClient.setConnectionStatusListener(liveAuctionPanel::updateClientBanner);
++            this.auctionClient.setBidRejectedListener(liveAuctionPanel::showBidRejected);
++            this.auctionClient.setUpcomingPoolListener(liveAuctionPanel::setSyncedUpcomingPool);
++            this.auctionClient.setSyncStateListener(liveAuctionPanel::applySyncState);
++            this.auctionClient.setAuctionResetListener(liveAuctionPanel::handleAuctionReset);
++            this.auctionClient.setLogBroadcastListener(liveAuctionPanel::appendExternalLog);
++
++            liveAuctionPanel.setSession(user, currentHumanTeam, auctionClient);
++            this.auctionClient.start();
++
++            setTitle(String.format("CricBid [PARTICIPANT: %s] — %s @ %s:%d",
++                    teamName, user.getUsername(), hostIp, serverPort));
++            showCard(CARD_LIVE);
++        }
+     }
+ 
+-    private void onAuctionStarted() {
+-        try {
+-            if (currentUser != null && currentUser.getTeamId() != null) {
++    private void onAuctionStarted(boolean quickMode) {
++        if (toggleBotsItem != null) {
++            toggleBotsItem.setSelected(auctionService.isBotsEnabled());
++        }
++        if (auctionServer != null) {
++            auctionServer.broadcastAuctionReset(quickMode);
++        }
++        if (currentUser != null && !currentUser.isAdmin() && currentUser.getTeamId() != null) {
++            try {
+                 this.currentHumanTeam = teamService.getTeamById(currentUser.getTeamId());
+-            } else {
+-                this.currentHumanTeam = teamService.getTeamById(1);
+-            }
+-        } catch (SQLException ignored) {}
++            } catch (SQLException ignored) {}
++        }
+ 
+-        liveAuctionPanel.setSession(currentUser, currentHumanTeam);
++        liveAuctionPanel.setSession(currentUser, currentHumanTeam, null);
++        if (auctionServer != null) {
++            liveAuctionPanel.updateHostBanner(auctionServer.getConnectedClientLabels());
++        }
+         showCard(CARD_LIVE);
+     }
+ 
++    private void handleLogout() {
++        stopNetworking();
++        auctionService.shutdown();
++        this.currentUser = null;
++        this.currentHumanTeam = null;
++        setToolbarAndMenusForSession(false, false);
++        setTitle("CricBid: Live Cricket Player Auction System");
++        showCard(CARD_LOGIN);
++    }
++
++    private void stopNetworking() {
++        if (auctionClient != null) {
++            auctionClient.stop();
++            auctionClient = null;
++        }
++        if (auctionServer != null) {
++            auctionServer.stop();
++            auctionServer = null;
++        }
++    }
++
+     private void handleExit() {
+         int confirm = JOptionPane.showConfirmDialog(this,
+                 "Are you sure you want to stop the auction and exit CricBid?",
+                 "Confirm Exit", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+         if (confirm == JOptionPane.YES_OPTION) {
++            stopNetworking();
+             auctionService.shutdown();
+             dispose();
+             System.exit(0);
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/PlayerPoolPanel.java src/main/java/com/cricbid/ui/PlayerPoolPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/PlayerPoolPanel.java	2026-11-02 15:56:47
++++ src/main/java/com/cricbid/ui/PlayerPoolPanel.java	2026-11-02 15:41:56
+@@ -60,7 +60,6 @@
+ 
+         initFilterBar();
+         initTable();
+-        refreshPlayers();
+     }
+ 
+     private void initFilterBar() {
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/ReportsPanel.java src/main/java/com/cricbid/ui/ReportsPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/ReportsPanel.java	2026-11-02 15:56:57
++++ src/main/java/com/cricbid/ui/ReportsPanel.java	2026-11-02 15:42:08
+@@ -44,7 +44,6 @@
+         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+ 
+         initComponents();
+-        refreshReports();
+     }
+ 
+     private void initComponents() {
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/SetupPanel.java src/main/java/com/cricbid/ui/SetupPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/SetupPanel.java	2026-11-02 15:59:21
++++ src/main/java/com/cricbid/ui/SetupPanel.java	2026-11-02 15:41:17
+@@ -1,8 +1,10 @@
+ package com.cricbid.ui;
+ 
++import com.cricbid.db.DBConnection;
+ import com.cricbid.model.OwnerType;
+ import com.cricbid.model.Team;
+ import com.cricbid.model.User;
++import com.cricbid.network.NetworkUtils;
+ import com.cricbid.service.AuctionService;
+ import com.cricbid.service.TeamService;
+ 
+@@ -28,25 +30,34 @@
+ import java.awt.Insets;
+ import java.sql.SQLException;
+ import java.util.ArrayList;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Set;
++import java.util.function.Consumer;
+ 
+ 
+ public class SetupPanel extends JPanel {
+ 
+     private final AuctionService auctionService;
+     private final TeamService teamService;
+-    private final Runnable onAuctionStarted;
++    private final Consumer<Boolean> onAuctionStarted;
+ 
++    private JLabel hostInfoLabel;
++    private JLabel connectedClientsLabel;
++    private JLabel teamComboLabel;
+     private JComboBox<String> teamComboBox;
+     private JRadioButton fullModeRadio;
+     private JRadioButton quickModeRadio;
+     private JSlider timerSlider;
+     private JSpinner purseSpinner;
+-    private final List<JCheckBox> botCheckBoxes = new ArrayList<>();
++    private JPanel humanTeamsPanel;
++    private JCheckBox enableBotsCheckBox;
++
++    private final List<JCheckBox> humanTeamCheckBoxes = new ArrayList<>();
+     private final List<Team> loadedTeams = new ArrayList<>();
+     private User currentUser;
+ 
+-    public SetupPanel(AuctionService auctionService, TeamService teamService, Runnable onAuctionStarted) {
++    public SetupPanel(AuctionService auctionService, TeamService teamService, Consumer<Boolean> onAuctionStarted) {
+         this.auctionService = auctionService;
+         this.teamService = teamService;
+         this.onAuctionStarted = onAuctionStarted;
+@@ -58,63 +69,104 @@
+ 
+     public void initUserSession(User user) {
+         this.currentUser = user;
++        boolean isAdmin = user != null && user.isAdmin();
++        teamComboLabel.setVisible(!isAdmin);
++        teamComboBox.setVisible(!isAdmin);
++
++        String lanIp = NetworkUtils.getLocalLanIp();
++        int port = DBConnection.getInstance().getServerPort();
++        hostInfoLabel.setText(String.format("📡 Auctioneer Host Ready — Enter IP  %s  on Participant Laptops (Port %d)", lanIp, port));
+         refreshTeamList();
+     }
+ 
++    public void updateConnectedClients(List<String> clientLabels) {
++        if (clientLabels == null || clientLabels.isEmpty()) {
++            connectedClientsLabel.setText("Connected Laptops (0): Waiting for owner1 / owner2 to log in...");
++            connectedClientsLabel.setForeground(new Color(160, 95, 10));
++        } else {
++            connectedClientsLabel.setText(String.format("🟢 Connected Laptops (%d): %s",
++                    clientLabels.size(), String.join("  |  ", clientLabels)));
++            connectedClientsLabel.setForeground(new Color(20, 120, 45));
++        }
++    }
++
+     private void initComponents() {
+         JPanel container = new JPanel(new GridBagLayout());
+         container.setBackground(Color.WHITE);
+         container.setBorder(BorderFactory.createCompoundBorder(
+                 BorderFactory.createLineBorder(new Color(215, 225, 235), 1),
+-                BorderFactory.createEmptyBorder(25, 30, 25, 30)
++                BorderFactory.createEmptyBorder(20, 28, 20, 28)
+         ));
+ 
+         GridBagConstraints gbc = new GridBagConstraints();
+-        gbc.insets = new Insets(8, 8, 8, 8);
++        gbc.insets = new Insets(6, 8, 6, 8);
+         gbc.fill = GridBagConstraints.HORIZONTAL;
+ 
+-        JLabel titleLabel = new JLabel("Auction Tournament Configuration");
+-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
++        JLabel titleLabel = new JLabel("Auction Tournament Configuration (Host Controller)");
++        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 19));
+         titleLabel.setForeground(new Color(25, 45, 85));
+         gbc.gridx = 0;
+         gbc.gridy = 0;
+         gbc.gridwidth = 2;
+         container.add(titleLabel, gbc);
+ 
+-        gbc.gridwidth = 1;
++        // Network status box for Multi-Laptop Review
++        JPanel netBox = new JPanel(new GridLayout(2, 1, 4, 4));
++        netBox.setBackground(new Color(238, 246, 255));
++        netBox.setBorder(BorderFactory.createCompoundBorder(
++                BorderFactory.createLineBorder(new Color(180, 210, 240)),
++                BorderFactory.createEmptyBorder(8, 12, 8, 12)
++        ));
++        hostInfoLabel = new JLabel("📡 Auctioneer Host IP: " + NetworkUtils.getLocalLanIp());
++        hostInfoLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
++        hostInfoLabel.setForeground(new Color(20, 65, 130));
++
++        connectedClientsLabel = new JLabel("Connected Laptops (0): Waiting for owner1 / owner2 to log in...");
++        connectedClientsLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
++        connectedClientsLabel.setForeground(new Color(160, 95, 10));
++
++        netBox.add(hostInfoLabel);
++        netBox.add(connectedClientsLabel);
+         gbc.gridy = 1;
++        container.add(netBox, gbc);
++
++        // Optional single-player team combo (hidden for ADMIN Auctioneer)
++        gbc.gridwidth = 1;
++        gbc.gridy = 2;
+         gbc.gridx = 0;
+-        container.add(new JLabel("Select Your Human Team:"), gbc);
++        teamComboLabel = new JLabel("Select Your Human Team:");
++        container.add(teamComboLabel, gbc);
+ 
+         gbc.gridx = 1;
+         teamComboBox = new JComboBox<>();
+         teamComboBox.setPreferredSize(new Dimension(240, 28));
+-        teamComboBox.addActionListener(e -> updateBotCheckboxesFromSelection());
+         container.add(teamComboBox, gbc);
+ 
+-        gbc.gridy = 2;
++        // Auction Mode radio buttons
++        gbc.gridy = 3;
+         gbc.gridx = 0;
+         container.add(new JLabel("Auction Mode:"), gbc);
+ 
+         gbc.gridx = 1;
+         JPanel radioPanel = new JPanel();
+         radioPanel.setOpaque(false);
+-        fullModeRadio = new JRadioButton("Full Auction (All Players)", true);
+-        quickModeRadio = new JRadioButton("Quick Auction (Top 20 Players)");
++        quickModeRadio = new JRadioButton("Quick Auction (Top 20 | Min Squad 8)", true);
++        fullModeRadio = new JRadioButton("Full Auction (48 Players | Min Squad 18)");
+         ButtonGroup modeGroup = new ButtonGroup();
+-        modeGroup.add(fullModeRadio);
+         modeGroup.add(quickModeRadio);
+-        radioPanel.add(fullModeRadio);
++        modeGroup.add(fullModeRadio);
+         radioPanel.add(quickModeRadio);
++        radioPanel.add(fullModeRadio);
+         container.add(radioPanel, gbc);
+ 
+-        gbc.gridy = 3;
++        // Round timer slider
++        gbc.gridy = 4;
+         gbc.gridx = 0;
+-        JLabel sliderLabel = new JLabel("Round Timer: 10s");
++        JLabel sliderLabel = new JLabel("Round Timer: 15s");
+         container.add(sliderLabel, gbc);
+ 
+         gbc.gridx = 1;
+-        timerSlider = new JSlider(5, 30, 10);
++        timerSlider = new JSlider(5, 30, 15);
+         timerSlider.setMajorTickSpacing(5);
+         timerSlider.setMinorTickSpacing(1);
+         timerSlider.setPaintTicks(true);
+@@ -122,7 +174,8 @@
+         timerSlider.addChangeListener(e -> sliderLabel.setText(String.format("Round Timer: %ds", timerSlider.getValue())));
+         container.add(timerSlider, gbc);
+ 
+-        gbc.gridy = 4;
++        // Starting purse spinner
++        gbc.gridy = 5;
+         gbc.gridx = 0;
+         container.add(new JLabel("Starting Team Purse (Cr):"), gbc);
+ 
+@@ -131,24 +184,36 @@
+         purseSpinner.setPreferredSize(new Dimension(100, 28));
+         container.add(purseSpinner, gbc);
+ 
+-        gbc.gridy = 5;
++        // Participating Human Franchises Checkboxes
++        gbc.gridy = 6;
+         gbc.gridx = 0;
+-        container.add(new JLabel("AI Bot Roster:"), gbc);
++        container.add(new JLabel("Participating Laptops:"), gbc);
+ 
+         gbc.gridx = 1;
+-        JPanel botPanel = new JPanel(new GridLayout(3, 2, 4, 4));
+-        botPanel.setBorder(BorderFactory.createTitledBorder("Check to designate as Bot"));
+-        botPanel.setOpaque(false);
+-        container.add(botPanel, gbc);
++        humanTeamsPanel = new JPanel(new GridLayout(3, 2, 6, 4));
++        humanTeamsPanel.setBorder(BorderFactory.createTitledBorder("Check Franchises Controlled by Human Laptops"));
++        humanTeamsPanel.setOpaque(false);
++        container.add(humanTeamsPanel, gbc);
+ 
+-        gbc.gridy = 6;
++        // Optional AI Bots checkbox (OFF by default for 3-laptop mode)
++        gbc.gridy = 7;
+         gbc.gridx = 0;
++        container.add(new JLabel("AI Bots (Other Teams):"), gbc);
++
++        gbc.gridx = 1;
++        enableBotsCheckBox = new JCheckBox("Enable Automated AI Bots for Unchecked Teams (Leave OFF for Human-Only)", false);
++        enableBotsCheckBox.setOpaque(false);
++        container.add(enableBotsCheckBox, gbc);
++
++        // Start button
++        gbc.gridy = 8;
++        gbc.gridx = 0;
+         gbc.gridwidth = 2;
+-        JButton startBtn = new JButton("Start Live Auction");
++        JButton startBtn = new JButton("Start Live Multi-Laptop Auction");
+         startBtn.setFont(new Font("SansSerif", Font.BOLD, 15));
+         startBtn.setBackground(new Color(25, 120, 55));
+         startBtn.setForeground(Color.BLACK);
+-        startBtn.setPreferredSize(new Dimension(220, 40));
++        startBtn.setPreferredSize(new Dimension(260, 40));
+         startBtn.addActionListener(e -> handleStartAuction());
+         container.add(startBtn, gbc);
+ 
+@@ -163,9 +228,19 @@
+             loadedTeams.clear();
+             loadedTeams.addAll(teamService.getAllTeamsWithSquads());
+             teamComboBox.removeAllItems();
++            humanTeamsPanel.removeAll();
++            humanTeamCheckBoxes.clear();
+ 
+-            for (Team t : loadedTeams) {
++            for (int i = 0; i < loadedTeams.size(); i++) {
++                Team t = loadedTeams.get(i);
+                 teamComboBox.addItem(t.getName());
++
++                // Default: Team 1 (owner1) and Team 2 (owner2) checked as Human
++                boolean defaultHuman = (t.getOwnerType() == OwnerType.HUMAN) || (i < 2);
++                JCheckBox cb = new JCheckBox(String.format("%s (owner%d)", t.getName(), t.getTeamId()), defaultHuman);
++                cb.setOpaque(false);
++                humanTeamCheckBoxes.add(cb);
++                humanTeamsPanel.add(cb);
+             }
+ 
+             if (currentUser != null && currentUser.getTeamId() != null) {
+@@ -177,41 +252,51 @@
+                 }
+             }
+ 
+-            updateBotCheckboxesFromSelection();
++            humanTeamsPanel.revalidate();
++            humanTeamsPanel.repaint();
+         } catch (SQLException ex) {
+             JOptionPane.showMessageDialog(this, "Failed to load teams: " + ex.getMessage(),
+                     "Database Error", JOptionPane.ERROR_MESSAGE);
+         }
+     }
+ 
+-    private void updateBotCheckboxesFromSelection() {
+-        int selectedIndex = teamComboBox.getSelectedIndex();
+-        for (int i = 0; i < loadedTeams.size(); i++) {
+-            Team t = loadedTeams.get(i);
+-            t.setOwnerType(i == selectedIndex ? OwnerType.HUMAN : OwnerType.BOT);
++    private void handleStartAuction() {
++        Set<Integer> humanTeamIds = new HashSet<>();
++        for (int i = 0; i < humanTeamCheckBoxes.size() && i < loadedTeams.size(); i++) {
++            if (humanTeamCheckBoxes.get(i).isSelected()) {
++                humanTeamIds.add(loadedTeams.get(i).getTeamId());
++            }
+         }
+-    }
+ 
+-    private void handleStartAuction() {
+-        int selectedTeamIdx = teamComboBox.getSelectedIndex();
+-        if (selectedTeamIdx < 0 || selectedTeamIdx >= loadedTeams.size()) {
+-            JOptionPane.showMessageDialog(this, "Please select a valid team.", "Validation Error", JOptionPane.WARNING_MESSAGE);
++        if (currentUser != null && !currentUser.isAdmin()) {
++            int selectedTeamIdx = teamComboBox.getSelectedIndex();
++            if (selectedTeamIdx >= 0 && selectedTeamIdx < loadedTeams.size()) {
++                humanTeamIds.add(loadedTeams.get(selectedTeamIdx).getTeamId());
++            }
++        }
++
++        if (humanTeamIds.isEmpty() && !enableBotsCheckBox.isSelected()) {
++            JOptionPane.showMessageDialog(this,
++                    "Please select at least one Participating Human Franchise (e.g., Thunder Hawks & Iron Wolves).",
++                    "Validation Error", JOptionPane.WARNING_MESSAGE);
+             return;
+         }
+ 
+-        Team humanTeam = loadedTeams.get(selectedTeamIdx);
+         double startingPurse = ((Double) purseSpinner.getValue());
+         int timerDuration = timerSlider.getValue();
+         boolean isQuickMode = quickModeRadio.isSelected();
++        boolean botsOn = enableBotsCheckBox.isSelected();
+ 
+         try {
+-            teamService.resetAllTeams(startingPurse, humanTeam.getTeamId());
++            teamService.resetAllTeams(startingPurse, humanTeamIds);
+             new com.cricbid.dao.impl.PlayerDAOImpl().resetAllStatus();
+-            auctionService.startAuction(timerDuration, isQuickMode);
++            auctionService.setBotsEnabled(botsOn);
+ 
+             if (onAuctionStarted != null) {
+-                onAuctionStarted.run();
++                onAuctionStarted.accept(isQuickMode);
+             }
++
++            auctionService.startAuction(timerDuration, isQuickMode);
+         } catch (SQLException ex) {
+             JOptionPane.showMessageDialog(this, "Failed to initiate auction in database: " + ex.getMessage(),
+                     "Database Error", JOptionPane.ERROR_MESSAGE);
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/TeamsPanel.java src/main/java/com/cricbid/ui/TeamsPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/TeamsPanel.java	2026-11-02 15:56:54
++++ src/main/java/com/cricbid/ui/TeamsPanel.java	2026-11-02 15:42:03
+@@ -4,6 +4,7 @@
+ import com.cricbid.model.PlayerRole;
+ import com.cricbid.model.SquadEntry;
+ import com.cricbid.model.Team;
++import com.cricbid.service.RuleValidator;
+ import com.cricbid.service.TeamService;
+ import com.cricbid.ui.renderer.SquadListCellRenderer;
+ 
+@@ -38,8 +39,6 @@
+ 
+         tabbedPane = new JTabbedPane();
+         add(tabbedPane, BorderLayout.CENTER);
+-
+-        refreshTeams();
+     }
+ 
+     public void refreshTeams() {
+@@ -67,16 +66,19 @@
+         purseLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+         purseLabel.setForeground(new Color(25, 120, 40));
+ 
+-        JLabel squadCountLabel = new JLabel(String.format("Squad Size: %d/25 (Min 18)", team.getSquadSize()));
++        int minSquad = RuleValidator.getActiveMinSquadSize();
++        int minBowlers = RuleValidator.getActiveMinBowlers();
++
++        JLabel squadCountLabel = new JLabel(String.format("Squad Size: %d/25 (Min %d)", team.getSquadSize(), minSquad));
+         squadCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+ 
+         JLabel overseasCountLabel = new JLabel(String.format("Overseas: %d/8", team.getOverseasCount()));
+         overseasCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+         if (team.getOverseasCount() > 8) overseasCountLabel.setForeground(Color.RED);
+ 
+-        JLabel bowlerCountLabel = new JLabel(String.format("Bowlers: %d (Min 5)", team.getBowlerCount()));
++        JLabel bowlerCountLabel = new JLabel(String.format("Bowlers: %d (Min %d)", team.getBowlerCount(), minBowlers));
+         bowlerCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+-        if (team.getBowlerCount() < 5) bowlerCountLabel.setForeground(new Color(180, 40, 40));
++        if (team.getBowlerCount() < minBowlers) bowlerCountLabel.setForeground(new Color(180, 40, 40));
+ 
+         JLabel keeperCountLabel = new JLabel(String.format("Keepers: %d (Min 1)", team.getWicketKeeperCount()));
+         keeperCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+diff -ruN review1_backup/src/main/java/com/cricbid/ui/TradeWindowPanel.java src/main/java/com/cricbid/ui/TradeWindowPanel.java
+--- review1_backup/src/main/java/com/cricbid/ui/TradeWindowPanel.java	2026-11-02 15:56:55
++++ src/main/java/com/cricbid/ui/TradeWindowPanel.java	2026-11-02 15:42:05
+@@ -57,7 +57,6 @@
+         setLayout(new BorderLayout(10, 10));
+         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+         initComponents();
+-        loadTeams();
+     }
+ 
+     private void initComponents() {
+diff -ruN review1_backup/src/main/resources/db.properties src/main/resources/db.properties
+--- review1_backup/src/main/resources/db.properties	2026-11-02 15:55:41
++++ src/main/resources/db.properties	2026-11-02 20:35:04
+@@ -1,5 +1,6 @@
+-# CricBid Database Configuration
+-db.url=jdbc:mysql://localhost:3306/cricbid?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+-db.user=root
+-db.password=password
+-db.driver=com.mysql.cj.jdbc.Driver
+\ No newline at end of file
++# CricBid Database & Multi-Laptop Network Configuration
++db.url=jdbc:mysql://localhost:3306/cricbid?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=4000
++db.user=cricbid
++db.password=cricbid123
++db.driver=com.mysql.cj.jdbc.Driver
++server.port=5050
