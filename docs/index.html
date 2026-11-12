@@ -306,7 +306,7 @@ async function detectJavaLaptopServer() {
   for (const base of candidates) {
     try {
       const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 800);
+      setTimeout(() => ctrl.abort(), 3500);
       const r = await fetch(base + '/api/state', {signal: ctrl.signal});
       if (r.ok) {
         javaBackendBase = base;
