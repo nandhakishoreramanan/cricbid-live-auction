@@ -170,6 +170,7 @@ public class WebAuctionPortalServer implements AuctionObserver {
                             if (externalLogCallback != null) {
                                 SwingUtilities.invokeLater(() -> externalLogCallback.accept(msg));
                             }
+                            publishTunnelToCloudRepo(publicTunnelUrl);
                         }
                     }
                 }
@@ -178,6 +179,23 @@ public class WebAuctionPortalServer implements AuctionObserver {
         }, "CricBid-PublicTunnel-Thread");
         t.setDaemon(true);
         t.start();
+    }
+
+    private void publishTunnelToCloudRepo(String tunnelUrl) {
+        Thread pub = new Thread(() -> {
+            try {
+                java.io.File f = new java.io.File("docs/tunnel.json");
+                if (f.getParentFile() != null && f.getParentFile().exists()) {
+                    java.nio.file.Files.writeString(f.toPath(),
+                            "{\"url\":\"" + tunnelUrl + "\"}\n", StandardCharsets.UTF_8);
+                    new ProcessBuilder("sh", "-c",
+                            "git add docs/tunnel.json && git commit -m 'Update live laptop tunnel URL' && git push origin main")
+                            .start();
+                }
+            } catch (Exception ignored) {}
+        }, "CricBid-TunnelPublisher");
+        pub.setDaemon(true);
+        pub.start();
     }
 
     public void stop() {

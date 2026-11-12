@@ -290,9 +290,16 @@ const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('cricbid_live_c
 async function detectJavaLaptopServer() {
   const hostVal = (document.getElementById('hostInput')?.value || '').trim();
   const candidates = [];
-  if (hostVal && hostVal !== 'cloud') {
+  if (hostVal && hostVal !== 'cloud' && hostVal !== 'localhost') {
     candidates.push(hostVal.startsWith('http') ? hostVal : `http://${hostVal}:8080`);
   }
+  try {
+    const tr = await fetch('tunnel.json?t=' + Date.now(), {cache: 'no-store'});
+    if (tr.ok) {
+      const td = await tr.json();
+      if (td && td.url) candidates.push(td.url);
+    }
+  } catch (e) {}
   candidates.push('http://localhost:8080');
   const cb = document.getElementById('connBanner');
   const ub = document.getElementById('userBadge');
