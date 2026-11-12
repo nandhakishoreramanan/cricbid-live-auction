@@ -312,32 +312,31 @@ public class MainFrame extends JFrame {
     }
 
     private void showWebPortalDialog() {
+        String cloudUrl = "https://nandhakishoreramanan.github.io/cricbid-live-auction/";
         String lanUrl = "http://" + NetworkUtils.getLocalLanIp() + ":8080";
-        String pubUrl = (webPortalServer != null && webPortalServer.getPublicTunnelUrl() != null)
-                ? webPortalServer.getPublicTunnelUrl()
-                : "Generating https://*.lhr.life tunnel (Wait 3s & click again)...";
-        String msg = "CricBid Pure-Java Live Web Portal is RUNNING on Port 8080!\n\n"
-                + "1. FREE PUBLIC INTERNET WEBSITE (Works on ANY Phone / Laptop anywhere):\n"
-                + "   " + pubUrl + "\n\n"
-                + "2. Same Wi-Fi / Hotspot URL (Fastest local LAN speed):\n"
+        String msg = "CricBid Live Web Portal & 24/7 Cloud Deployment:\n\n"
+                + "1. 24/7 PERMANENT CLOUD DEPLOYMENT (Works even when your laptop is OFF):\n"
+                + "   " + cloudUrl + "\n\n"
+                + "2. LIVE JAVA HTTP SERVER ON WI-FI / HOTSPOT (Synced with this Swing Window):\n"
                 + "   " + lanUrl + "\n\n"
-                + "3. Local Browser on this Laptop:\n"
-                + "   http://localhost:8080\n\n"
-                + "Every browser bid, countdown timer, and chat syncs live with this Java Swing window & MySQL.";
-        Object[] options = {"Copy Public/LAN URL", "Open in Browser Now", "Close"};
-        int choice = JOptionPane.showOptionDialog(this, msg, "Java HTTP Web Portal (Port 8080)",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[1]);
+                + "3. LOCAL JAVA SERVER ON THIS LAPTOP:\n"
+                + "   http://localhost:8080";
+        Object[] options = {"Open 24/7 Cloud URL", "Open Local Java Web Server (8080)", "Copy Cloud URL", "Close"};
+        int choice = JOptionPane.showOptionDialog(this, msg, "CricBid Live Web & Cloud Deployment",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
         if (choice == 0) {
-            String toCopy = (webPortalServer != null && webPortalServer.getPublicTunnelUrl() != null)
-                    ? webPortalServer.getPublicTunnelUrl()
-                    : lanUrl;
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
-                    new java.awt.datatransfer.StringSelection(toCopy), null);
-            JOptionPane.showMessageDialog(this, "Copied to clipboard:\n" + toCopy, "URL Copied", JOptionPane.INFORMATION_MESSAGE);
+            try {
+                java.awt.Desktop.getDesktop().browse(new java.net.URI(cloudUrl));
+            } catch (Exception ignored) {}
         } else if (choice == 1) {
             try {
                 java.awt.Desktop.getDesktop().browse(new java.net.URI("http://localhost:8080"));
             } catch (Exception ignored) {}
+        } else if (choice == 2) {
+            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                    new java.awt.datatransfer.StringSelection(cloudUrl), null);
+            JOptionPane.showMessageDialog(this, "Copied 24/7 Cloud URL to clipboard:\n" + cloudUrl,
+                    "URL Copied", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
