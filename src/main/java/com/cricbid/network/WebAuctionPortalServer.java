@@ -147,20 +147,17 @@ public class WebAuctionPortalServer implements AuctionObserver {
         if (tunnelProcess != null && tunnelProcess.isAlive()) return;
         Thread t = new Thread(() -> {
             try {
+                String cfBin = new java.io.File("/opt/homebrew/bin/cloudflared").exists()
+                        ? "/opt/homebrew/bin/cloudflared" : "cloudflared";
                 ProcessBuilder pb = new ProcessBuilder(
-                        "ssh",
-                        "-o", "StrictHostKeyChecking=no",
-                        "-o", "UserKnownHostsFile=/dev/null",
-                        "-o", "ServerAliveInterval=30",
-                        "-R", "80:localhost:" + httpPort,
-                        "nokey@localhost.run"
+                        cfBin, "tunnel", "--url", "http://localhost:" + httpPort
                 );
                 pb.redirectErrorStream(true);
                 tunnelProcess = pb.start();
                 try (java.io.BufferedReader br = new java.io.BufferedReader(
                         new java.io.InputStreamReader(tunnelProcess.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
-                    java.util.regex.Pattern urlPat = java.util.regex.Pattern.compile("(https://[a-zA-Z0-9.-]+\\.lhr\\.life)");
+                    java.util.regex.Pattern urlPat = java.util.regex.Pattern.compile("(https://[a-zA-Z0-9-]+\\.trycloudflare\\.com)");
                     while (active && (line = br.readLine()) != null) {
                         java.util.regex.Matcher m = urlPat.matcher(line);
                         if (m.find()) {
