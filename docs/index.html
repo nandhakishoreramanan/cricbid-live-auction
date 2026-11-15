@@ -288,16 +288,24 @@ let javaBackendBase = null; // Automatically connects to Laptop Java Server (loc
 const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('cricbid_live_channel') : null;
 
 async function detectJavaLaptopServer() {
-  const hostVal = (document.getElementById('hostInput')?.value || '').trim();
+  const hostInputEl = document.getElementById('hostInput');
+  const hostVal = (hostInputEl?.value || '').trim();
   const candidates = [];
   if (hostVal && hostVal !== 'cloud' && hostVal !== 'localhost') {
     candidates.push(hostVal.startsWith('http') ? hostVal : `http://${hostVal}:8080`);
   }
   try {
+    const rawRes = await fetch('https://raw.githubusercontent.com/nandhakishoreramanan/cricbid-live-auction/main/docs/tunnel.json?t=' + Date.now(), {cache: 'no-store'});
+    if (rawRes.ok) {
+      const td = await rawRes.json();
+      if (td && td.url && !candidates.includes(td.url)) candidates.push(td.url);
+    }
+  } catch (e) {}
+  try {
     const tr = await fetch('tunnel.json?t=' + Date.now(), {cache: 'no-store'});
     if (tr.ok) {
       const td = await tr.json();
-      if (td && td.url) candidates.push(td.url);
+      if (td && td.url && !candidates.includes(td.url)) candidates.push(td.url);
     }
   } catch (e) {}
   candidates.push('http://localhost:8080');
@@ -310,15 +318,24 @@ async function detectJavaLaptopServer() {
       const r = await fetch(base + '/api/state', {signal: ctrl.signal});
       if (r.ok) {
         javaBackendBase = base;
+        if (hostInputEl && (hostInputEl.value === 'localhost' || !hostInputEl.value)) {
+          hostInputEl.value = base;
+        }
         if (cb) {
           cb.style.background = '#14532d';
           cb.style.borderColor = '#4ade80';
           cb.style.color = '#4ade80';
           cb.textContent = '* [LAPTOP CONNECTED] Live Java Swing + MySQL Server Detected at ' + base;
         }
-        if (!session && ub) {
+        if (ub) {
           ub.style.background = '#14532d';
-          ub.textContent = '* LAPTOP JAVA SERVER CONNECTED (8080)';
+          ub.textContent = session
+            ? ((session.isAdmin ? '* AUCTIONEER HOST (admin)' : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')') + ' [SYNCED WITH JAVA LAPTOP]')
+            : '* LAPTOP JAVA SERVER CONNECTED (8080)';
+        }
+        const bt = document.getElementById('bannerText');
+        if (session && bt) {
+          bt.textContent = '* [JAVA SERVER SYNCED] Connected Live to Your Laptop Java Swing + MySQL Server (' + base + ')';
         }
         return true;
       }
@@ -338,7 +355,7 @@ async function detectJavaLaptopServer() {
   return false;
 }
 detectJavaLaptopServer();
-setInterval(() => { if(!session) detectJavaLaptopServer(); }, 3000);
+setInterval(() => { if(!javaBackendBase) detectJavaLaptopServer(); }, 3000);
 
 function playTone(freq, durMs, type='sine') {
   if(!soundEnabled) return;
