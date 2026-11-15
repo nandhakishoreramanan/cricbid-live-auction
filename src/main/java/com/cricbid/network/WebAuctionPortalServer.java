@@ -186,7 +186,7 @@ public class WebAuctionPortalServer implements AuctionObserver {
                     java.nio.file.Files.writeString(f.toPath(),
                             "{\"url\":\"" + tunnelUrl + "\"}\n", StandardCharsets.UTF_8);
                     ProcessBuilder pb = new ProcessBuilder("sh", "-c",
-                            "export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH; git add docs/tunnel.json && git commit -m 'Update live laptop tunnel URL' && git push origin main");
+                            "export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH; git add docs/tunnel.json && git commit -m 'Update live laptop tunnel URL' && git pull --rebase origin main && git push origin main");
                     pb.start();
                 }
             } catch (Exception ignored) {}

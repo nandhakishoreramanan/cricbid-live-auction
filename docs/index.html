@@ -294,53 +294,69 @@ async function detectJavaLaptopServer() {
   if (hostVal && hostVal !== 'cloud' && hostVal !== 'localhost') {
     candidates.push(hostVal.startsWith('http') ? hostVal : `http://${hostVal}:8080`);
   }
-  try {
-    const rawRes = await fetch('https://raw.githubusercontent.com/nandhakishoreramanan/cricbid-live-auction/main/docs/tunnel.json?t=' + Date.now(), {cache: 'no-store'});
-    if (rawRes.ok) {
-      const td = await rawRes.json();
-      if (td && td.url && !candidates.includes(td.url)) candidates.push(td.url);
+
+  // Fetch tunnel URL from GitHub REST API (0-second cache delay!) + fallbacks in parallel
+  const fetchSources = await Promise.allSettled([
+    fetch('https://api.github.com/repos/nandhakishoreramanan/cricbid-live-auction/contents/docs/tunnel.json?t=' + Date.now(), {cache: 'no-store'})
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && d.content ? JSON.parse(atob(d.content.replace(/\s/g, ''))).url : null),
+    fetch('https://raw.githubusercontent.com/nandhakishoreramanan/cricbid-live-auction/main/docs/tunnel.json?t=' + Date.now(), {cache: 'no-store'})
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d ? d.url : null),
+    fetch('tunnel.json?t=' + Date.now(), {cache: 'no-store'})
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d ? d.url : null)
+  ]);
+
+  for (const res of fetchSources) {
+    if (res.status === 'fulfilled' && res.value && !candidates.includes(res.value)) {
+      candidates.push(res.value);
     }
-  } catch (e) {}
-  try {
-    const tr = await fetch('tunnel.json?t=' + Date.now(), {cache: 'no-store'});
-    if (tr.ok) {
-      const td = await tr.json();
-      if (td && td.url && !candidates.includes(td.url)) candidates.push(td.url);
-    }
-  } catch (e) {}
+  }
   candidates.push('http://localhost:8080');
+
   const cb = document.getElementById('connBanner');
   const ub = document.getElementById('userBadge');
-  for (const base of candidates) {
+
+  // Probe all candidate URLs in parallel so a stale URL never blocks the live one
+  const probeCandidate = async (base) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2200);
     try {
-      const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 3500);
       const r = await fetch(base + '/api/state', {signal: ctrl.signal});
-      if (r.ok) {
-        javaBackendBase = base;
-        if (hostInputEl && (hostInputEl.value === 'localhost' || !hostInputEl.value)) {
-          hostInputEl.value = base;
-        }
-        if (cb) {
-          cb.style.background = '#14532d';
-          cb.style.borderColor = '#4ade80';
-          cb.style.color = '#4ade80';
-          cb.textContent = '* [LAPTOP CONNECTED] Live Java Swing + MySQL Server Detected at ' + base;
-        }
-        if (ub) {
-          ub.style.background = '#14532d';
-          ub.textContent = session
-            ? ((session.isAdmin ? '* AUCTIONEER HOST (admin)' : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')') + ' [SYNCED WITH JAVA LAPTOP]')
-            : '* LAPTOP JAVA SERVER CONNECTED (8080)';
-        }
-        const bt = document.getElementById('bannerText');
-        if (session && bt) {
-          bt.textContent = '* [JAVA SERVER SYNCED] Connected Live to Your Laptop Java Swing + MySQL Server (' + base + ')';
-        }
-        return true;
-      }
-    } catch (e) {}
-  }
+      clearTimeout(timer);
+      if (r.ok) return base;
+    } catch (e) {
+      clearTimeout(timer);
+    }
+    throw new Error('offline');
+  };
+
+  try {
+    const liveBase = await Promise.any(candidates.map(probeCandidate));
+    javaBackendBase = liveBase;
+    if (hostInputEl && (hostInputEl.value === 'localhost' || !hostInputEl.value || hostInputEl.value.includes('trycloudflare.com'))) {
+      hostInputEl.value = liveBase;
+    }
+    if (cb) {
+      cb.style.background = '#14532d';
+      cb.style.borderColor = '#4ade80';
+      cb.style.color = '#4ade80';
+      cb.textContent = '* [LAPTOP CONNECTED] Live Java Swing + MySQL Server Detected at ' + liveBase;
+    }
+    if (ub) {
+      ub.style.background = '#14532d';
+      ub.textContent = session
+        ? ((session.isAdmin ? '* AUCTIONEER HOST (admin)' : '* LIVE FRANCHISE: ' + session.teamName + ' (' + session.username + ')') + ' [SYNCED WITH JAVA LAPTOP]')
+        : '* LAPTOP JAVA SERVER CONNECTED (8080)';
+    }
+    const bt = document.getElementById('bannerText');
+    if (session && bt) {
+      bt.textContent = '* [JAVA SERVER SYNCED] Connected Live to Your Laptop Java Swing + MySQL Server (' + liveBase + ')';
+    }
+    return true;
+  } catch (e) {}
+
   javaBackendBase = null;
   if (cb) {
     cb.style.background = '#0b132b';
@@ -355,7 +371,7 @@ async function detectJavaLaptopServer() {
   return false;
 }
 detectJavaLaptopServer();
-setInterval(() => { if(!javaBackendBase) detectJavaLaptopServer(); }, 3000);
+setInterval(() => { if(!javaBackendBase) detectJavaLaptopServer(); }, 2500);
 
 function playTone(freq, durMs, type='sine') {
   if(!soundEnabled) return;
