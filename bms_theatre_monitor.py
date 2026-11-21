@@ -88,11 +88,49 @@ def _macos_notify(title: str, msg: str, sound: str = "Glass"):
 
 
 def _macos_sound(path: str = "/System/Library/Sounds/Glass.aiff"):
+    """Plays audio chime directly through macOS audio engine (bypasses DND)."""
     try:
         subprocess.Popen(["afplay", path],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
+
+
+def _macos_voice(text: str):
+    """Speaks through macOS TTS synthesizer aloud (bypasses DND)."""
+    try:
+        subprocess.Popen(["say", "-v", "Samantha", text],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+def _macos_modal_alert(title: str, msg: str, url: str):
+    """
+    Displays a prominent on-screen modal alert that breaks through Do Not Disturb.
+    Has a 'Book Now' button that opens the booking website directly in your browser.
+    """
+    def _run():
+        try:
+            safe_title = title.replace('"', '\\"')
+            safe_msg = msg.replace('"', '\\"')
+            script = f'''
+            tell application "System Events"
+                activate
+                set userChoice to button returned of (display alert "{safe_title}" message "{safe_msg}" as critical buttons {{"Dismiss", "Book Now"}} default button "Book Now" giving up after 60)
+                if userChoice is "Book Now" then
+                    open location "{url}"
+                end if
+            end tell
+            '''
+            subprocess.run(["osascript", "-e", script], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    import threading
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
 
 
 def _ntfy(topic: Optional[str], title: str, body: str, url: str,
@@ -162,7 +200,7 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
     print("=" * 65 + "\n")
     sys.stdout.write("\a\a\a"); sys.stdout.flush()
 
-    # ── 2. macOS desktop notification ────────────────────────────────────────
+    # ── 2. macOS desktop notification & DND overrides ───────────────────────
     _macos_notify(
         title=f"🎬 [{source}] Booking Open!",
         msg=f"{len(names)} theatre(s): {plain_list[:120]}",
@@ -170,6 +208,20 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
     )
     if not args.no_sound:
         _macos_sound()
+        _macos_voice(f"Alert! New theatres opened on {source} for Avengers Doomsday!")
+
+    # On-screen modal alert (pops up over all windows, breaks through DND)
+    _macos_modal_alert(
+        title=f"🚨 [{source}] Booking Open!",
+        msg=f"{len(names)} new theatre(s) open:\n{plain_list}\n\nClick 'Book Now' to open your browser.",
+        url=booking_url
+    )
+
+    if getattr(args, "auto_open", False):
+        try:
+            subprocess.Popen(["open", booking_url])
+        except Exception:
+            pass
 
     # ── 3. iPhone via ntfy ───────────────────────────────────────────────────
     ntfy_lines = [f"• {t['name']} → {', '.join(t['shows']) or 'shows pending'}"
@@ -543,7 +595,27 @@ def main():
                    default=os.environ.get("WEBHOOK_URL"),
                    help="Discord/Slack webhook URL (env: WEBHOOK_URL)")
 
-    run_monitor(p.parse_args())
+    p.add_argument("--auto-open", action="store_true",
+                   help="Automatically open the booking page in default browser when new theatres open")
+    p.add_argument("--test-alert", action="store_true",
+                   help="Fire a sample alert immediately (banner, sound, voice, popup, ntfy) to verify DND bypass")
+
+    args = p.parse_args()
+    if args.test_alert:
+        print(f"{C.G}Firing sample alert to test Mac notifications & DND overrides...{C.X}")
+        fire_alert(
+            "Test (BMS)",
+            [
+                {"name": "PVR: VR Chennai, Anna Nagar", "shows": ["10:00 AM (ENG)", "01:30 PM (ENG)", "08:30 PM (ENG)"]},
+                {"name": "Sathyam Cinemas (SPI), Royapettah", "shows": ["11:00 AM (ENG)", "03:15 PM (ENG)"]}
+            ],
+            BMS_URL,
+            args
+        )
+        print(f"{C.G}Test alert completed!{C.X}")
+        return
+
+    run_monitor(args)
 
 
 if __name__ == "__main__":
