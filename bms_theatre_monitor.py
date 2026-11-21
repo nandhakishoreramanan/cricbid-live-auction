@@ -269,19 +269,37 @@ def _fetch_html(session: requests.Session, url: str, args) -> Optional[str]:
     """
     Fetches raw HTML from target URL, supporting:
       1. Direct requests with browser headers
-      2. ScraperAPI (if --scraperapi-key is provided, uses country_code=in)
+      2. ScraperAPI (supports multiple keys with automatic failover if tokens run out)
       3. ZenRows (if --zenrows-key is provided, uses proxy_country=in)
       4. Custom HTTP/SOCKS5 proxy (if --proxy-url is provided)
     """
     import urllib.parse
     scraperapi_key = getattr(args, "scraperapi_key", None)
+    backup_key = getattr(args, "scraperapi_backup_key", None)
     zenrows_key = getattr(args, "zenrows_key", None)
     proxy_url = getattr(args, "proxy_url", None)
 
+    # Collect all ScraperAPI keys (supports comma-separated list or backup key)
+    keys = []
+    if scraperapi_key:
+        keys.extend([k.strip() for k in scraperapi_key.split(",") if k.strip()])
+    if backup_key:
+        keys.extend([k.strip() for k in backup_key.split(",") if k.strip()])
+
     try:
-        if scraperapi_key:
-            fetch_url = f"https://api.scraperapi.com?api_key={scraperapi_key}&country_code=in&url={urllib.parse.quote(url)}"
-            resp = session.get(fetch_url, timeout=45)
+        if keys:
+            for idx, key in enumerate(keys):
+                fetch_url = f"https://api.scraperapi.com?api_key={key}&country_code=in&url={urllib.parse.quote(url)}"
+                resp = session.get(fetch_url, timeout=45)
+                if resp.status_code == 200:
+                    return resp.text
+                elif resp.status_code in (401, 402, 403, 429) and len(keys) > 1 and idx < len(keys) - 1:
+                    log(f"[ScraperAPI] Key #{idx+1} out of credits (HTTP {resp.status_code}). Switching to backup key...", C.Y)
+                    continue
+                else:
+                    log(f"[ScraperAPI] HTTP {resp.status_code} for {url[:55]}...", C.R)
+                    return None
+            return None
         elif zenrows_key:
             fetch_url = f"https://api.zenrows.com/v1/?apikey={zenrows_key}&url={urllib.parse.quote(url)}&premium_proxy=true&proxy_country=in"
             resp = session.get(fetch_url, timeout=45)
@@ -654,6 +672,9 @@ def main():
     p.add_argument("--scraperapi-key",
                    default=os.environ.get("SCRAPERAPI_KEY"),
                    help="ScraperAPI key (env: SCRAPERAPI_KEY) to route cloud requests through Indian residential IPs")
+    p.add_argument("--scraperapi-backup-key",
+                   default=os.environ.get("SCRAPERAPI_BACKUP_KEY"),
+                   help="Backup ScraperAPI key (env: SCRAPERAPI_BACKUP_KEY) to auto-switch if primary runs out of tokens")
     p.add_argument("--zenrows-key",
                    default=os.environ.get("ZENROWS_KEY"),
                    help="ZenRows API key (env: ZENROWS_KEY) to route cloud requests through Indian residential IPs")
