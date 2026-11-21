@@ -265,21 +265,54 @@ BROWSER_HEADERS = {
 }
 
 
-def _bms_fetch(session: requests.Session, url: str) -> Optional[Dict]:
+def _fetch_html(session: requests.Session, url: str, args) -> Optional[str]:
+    """
+    Fetches raw HTML from target URL, supporting:
+      1. Direct requests with browser headers
+      2. ScraperAPI (if --scraperapi-key is provided, uses country_code=in)
+      3. ZenRows (if --zenrows-key is provided, uses proxy_country=in)
+      4. Custom HTTP/SOCKS5 proxy (if --proxy-url is provided)
+    """
+    import urllib.parse
+    scraperapi_key = getattr(args, "scraperapi_key", None)
+    zenrows_key = getattr(args, "zenrows_key", None)
+    proxy_url = getattr(args, "proxy_url", None)
+
     try:
-        resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
+        if scraperapi_key:
+            fetch_url = f"https://api.scraperapi.com?api_key={scraperapi_key}&country_code=in&url={urllib.parse.quote(url)}"
+            resp = session.get(fetch_url, timeout=45)
+        elif zenrows_key:
+            fetch_url = f"https://api.zenrows.com/v1/?apikey={zenrows_key}&url={urllib.parse.quote(url)}&premium_proxy=true&proxy_country=in"
+            resp = session.get(fetch_url, timeout=45)
+        elif proxy_url:
+            resp = session.get(url, headers=BROWSER_HEADERS, proxies={"http": proxy_url, "https": proxy_url}, timeout=25)
+        else:
+            resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
+
         if resp.status_code != 200:
-            log(f"[BMS] HTTP {resp.status_code}", C.R)
+            log(f"HTTP {resp.status_code} for {url[:55]}...", C.R)
             return None
-        idx = resp.text.find("window.__INITIAL_STATE__ = ")
+        return resp.text
+    except Exception as e:
+        log(f"Fetch error: {e}", C.R)
+        return None
+
+
+def _bms_fetch(session: requests.Session, url: str, args) -> Optional[Dict]:
+    html = _fetch_html(session, url, args)
+    if not html:
+        return None
+    try:
+        idx = html.find("window.__INITIAL_STATE__ = ")
         if idx == -1:
-            log("[BMS] __INITIAL_STATE__ not found", C.R)
+            log("[BMS] __INITIAL_STATE__ not found in page", C.R)
             return None
         start = idx + len("window.__INITIAL_STATE__ = ")
-        state, _ = json.JSONDecoder().raw_decode(resp.text[start:])
+        state, _ = json.JSONDecoder().raw_decode(html[start:])
         return state
     except Exception as e:
-        log(f"[BMS] fetch error: {e}", C.R)
+        log(f"[BMS] JSON parse error: {e}", C.R)
         return None
 
 
@@ -328,23 +361,22 @@ def bms_extract(state: Dict) -> Tuple[Dict[str, Dict], List[str]]:
 #  DISTRICT SCRAPER
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _district_fetch(session: requests.Session, url: str) -> Optional[Dict]:
+def _district_fetch(session: requests.Session, url: str, args) -> Optional[Dict]:
+    html = _fetch_html(session, url, args)
+    if not html:
+        return None
     try:
-        resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
-        if resp.status_code != 200:
-            log(f"[District] HTTP {resp.status_code}", C.R)
-            return None
         import re
         m = re.search(
             r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-            resp.text, re.DOTALL
+            html, re.DOTALL
         )
         if not m:
-            log("[District] __NEXT_DATA__ not found", C.R)
+            log("[District] __NEXT_DATA__ not found in page", C.R)
             return None
         return json.loads(m.group(1))
     except Exception as e:
-        log(f"[District] fetch error: {e}", C.R)
+        log(f"[District] JSON parse error: {e}", C.R)
         return None
 
 
@@ -409,14 +441,24 @@ def district_extract(nd: Dict) -> Tuple[Dict[str, Dict], List[str]]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def load_state(path: str) -> Dict:
+    default_state = {
+        "bms": {"theatres": {}, "dates": []},
+        "district": {"theatres": {}, "dates": []}
+    }
     if os.path.exists(path):
         try:
             with open(path) as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    if "bms" in data and "district" in data:
+                        return data
+                    if "theatres" in data:
+                        default_state["bms"]["theatres"] = data.get("theatres", {})
+                        default_state["bms"]["dates"] = data.get("dates", [])
+                        return default_state
         except Exception:
             pass
-    return {"bms": {"theatres": {}, "dates": []},
-            "district": {"theatres": {}, "dates": []}}
+    return default_state
 
 
 def save_state(path: str, data: Dict):
@@ -433,7 +475,7 @@ def save_state(path: str, data: Dict):
 
 def run_monitor(args):
     # Rotate Chrome profile per run → different TLS fingerprint each time
-    _chrome = random.choice(["chrome120", "chrome124", "chrome126", "chrome131"])
+    _chrome = random.choice(["chrome120", "chrome123", "chrome124", "chrome131"])
     log(f"Chrome impersonation profile: {_chrome}")
     session = requests.Session(impersonate=_chrome)
 
@@ -476,7 +518,7 @@ def run_monitor(args):
     while True:
         try:
             # ── BookMyShow ────────────────────────────────────────────────────
-            bms_state = _bms_fetch(session, args.bms_url)
+            bms_state = _bms_fetch(session, args.bms_url, args)
             if bms_state:
                 errors["bms"] = 0
                 theatres, dates = bms_extract(bms_state)
@@ -513,7 +555,7 @@ def run_monitor(args):
                 log(f"[BMS] Error #{errors['bms']} — skipping", C.Y)
 
             # ── District ──────────────────────────────────────────────────────
-            dist_nd = _district_fetch(session, args.district_url)
+            dist_nd = _district_fetch(session, args.district_url, args)
             if dist_nd:
                 errors["district"] = 0
                 theatres_d, dates_d = district_extract(dist_nd)
@@ -608,6 +650,16 @@ def main():
     p.add_argument("--webhook-url",
                    default=os.environ.get("WEBHOOK_URL"),
                    help="Discord/Slack webhook URL (env: WEBHOOK_URL)")
+    # Cloud Proxy / Scraper API for bypassing datacenter IP blocks
+    p.add_argument("--scraperapi-key",
+                   default=os.environ.get("SCRAPERAPI_KEY"),
+                   help="ScraperAPI key (env: SCRAPERAPI_KEY) to route cloud requests through Indian residential IPs")
+    p.add_argument("--zenrows-key",
+                   default=os.environ.get("ZENROWS_KEY"),
+                   help="ZenRows API key (env: ZENROWS_KEY) to route cloud requests through Indian residential IPs")
+    p.add_argument("--proxy-url",
+                   default=os.environ.get("PROXY_URL"),
+                   help="Custom HTTP/SOCKS5 proxy URL (env: PROXY_URL)")
 
     p.add_argument("--auto-open", action="store_true",
                    help="Automatically open the booking page in default browser when new theatres open")
