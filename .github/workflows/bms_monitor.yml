@@ -1,0 +1,66 @@
+name: 🎬 BMS + District Theatre Monitor — Avengers Doomsday
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # Every 5 minutes (GitHub minimum)
+  workflow_dispatch:          # Manual trigger from Actions tab
+
+permissions:
+  contents: write             # Needed to commit state file back
+
+jobs:
+  check-theatres:
+    name: Check BookMyShow + District for new theatres
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install curl_cffi --quiet
+
+      # Random 5–25s jitter so requests never hit BMS/District at the
+      # same clock second every 5 minutes (avoids bot-pattern detection)
+      - name: Random startup jitter
+        run: |
+          SLEEP=$((RANDOM % 20 + 5))
+          echo "Sleeping ${SLEEP}s..."
+          sleep $SLEEP
+
+      - name: Check BookMyShow + District for new theatres
+        env:
+          NTFY_TOPIC:          ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER:         ${{ secrets.NTFY_SERVER }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+          WEBHOOK_URL:         ${{ secrets.WEBHOOK_URL }}
+          NO_COLOR:            "1"       # Clean CI logs without ANSI codes
+        run: |
+          python3 bms_theatre_monitor.py \
+            --once \
+            --state-file bms_theatres_state.json \
+            --ntfy-topic  "${NTFY_TOPIC:-}" \
+            --ntfy-server "${NTFY_SERVER:-https://ntfy.sh}"
+
+      # Commit updated state only if it changed
+      - name: Persist theatre state
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bms_theatres_state.json
+          if git diff --cached --quiet; then
+            echo "No state change — nothing to commit."
+          else
+            git commit -m "chore: update theatre state [skip ci]"
+            git push
+          fi
