@@ -251,9 +251,23 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
 #  BOOKMYSHOW SCRAPER
 # ══════════════════════════════════════════════════════════════════════════════
 
+BROWSER_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,ta;q=0.8",
+    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"macOS"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+
 def _bms_fetch(session: requests.Session, url: str) -> Optional[Dict]:
     try:
-        resp = session.get(url, timeout=20)
+        resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
         if resp.status_code != 200:
             log(f"[BMS] HTTP {resp.status_code}", C.R)
             return None
@@ -316,7 +330,7 @@ def bms_extract(state: Dict) -> Tuple[Dict[str, Dict], List[str]]:
 
 def _district_fetch(session: requests.Session, url: str) -> Optional[Dict]:
     try:
-        resp = session.get(url, timeout=20)
+        resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
         if resp.status_code != 200:
             log(f"[District] HTTP {resp.status_code}", C.R)
             return None
