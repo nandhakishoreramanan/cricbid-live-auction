@@ -134,12 +134,13 @@ def _macos_modal_alert(title: str, msg: str, url: str):
 
 
 def _ntfy(topic: Optional[str], title: str, body: str, url: str,
-          server: str = DEFAULT_NTFY_SERVER):
+          server: Optional[str] = None):
     """Send iPhone push via ntfy.sh (free, no account needed)."""
     if not topic:
         return
     try:
-        endpoint = f"{server.rstrip('/')}/{topic}"
+        base_server = (server or DEFAULT_NTFY_SERVER).rstrip("/")
+        endpoint = f"{base_server}/{topic}"
         safe_title = title.encode("ascii", errors="ignore").decode("ascii").strip() or "BMS Alert"
         headers = {
             "Title": safe_title,
