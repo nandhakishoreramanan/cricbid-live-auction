@@ -51,6 +51,7 @@ DISTRICT_URL = (
 )
 DEFAULT_STATE_FILE = "bms_theatres_state.json"
 DEFAULT_NTFY_SERVER = "https://ntfy.sh"
+DEFAULT_NTFY_TOPIC = "nandy-bms-avengers-2026"
 
 # ── Terminal colours — auto-disabled in CI / non-TTY environments ──────────────
 _NO_COLOR = not sys.stdout.isatty() or os.environ.get("NO_COLOR")
@@ -652,7 +653,7 @@ def main():
                    help=f"Path to state JSON file (default: {DEFAULT_STATE_FILE})")
     # ntfy (iPhone)
     p.add_argument("--ntfy-topic",
-                   default=os.environ.get("NTFY_TOPIC"),
+                   default=os.environ.get("NTFY_TOPIC", DEFAULT_NTFY_TOPIC),
                    help="ntfy topic for iPhone push (env: NTFY_TOPIC). "
                         "Install 'ntfy' on iPhone → subscribe to https://ntfy.sh/<topic>")
     p.add_argument("--ntfy-server",
