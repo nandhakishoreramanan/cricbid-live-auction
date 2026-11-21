@@ -27,7 +27,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install curl_cffi --quiet
+        run: pip install -r requirements.txt --quiet
 
       # Random 5–25s jitter so requests never hit BMS/District at the
       # same clock second every 5 minutes (avoids bot-pattern detection)
