@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "*/5 * * * *"   # Every 5 minutes (GitHub minimum)
   workflow_dispatch:          # Manual trigger from Actions tab
+    inputs:
+      test_alert:
+        description: 'Send test notification to iPhone from Cloud'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write             # Needed to commit state file back
@@ -50,11 +56,15 @@ jobs:
           WEBHOOK_URL:         ${{ secrets.WEBHOOK_URL }}
           NO_COLOR:            "1"       # Clean CI logs without ANSI codes
         run: |
-          python3 bms_theatre_monitor.py \
-            --once \
-            --state-file bms_theatres_state.json \
-            --ntfy-topic  "${NTFY_TOPIC:-}" \
-            --ntfy-server "${NTFY_SERVER:-https://ntfy.sh}"
+          if [ "${{ inputs.test_alert }}" = "true" ]; then
+            python3 bms_theatre_monitor.py --test-alert --ntfy-topic "${NTFY_TOPIC:-}"
+          else
+            python3 bms_theatre_monitor.py \
+              --once \
+              --state-file bms_theatres_state.json \
+              --ntfy-topic  "${NTFY_TOPIC:-}" \
+              --ntfy-server "${NTFY_SERVER:-https://ntfy.sh}"
+          fi
 
       # Commit updated state only if it changed
       - name: Persist theatre state
