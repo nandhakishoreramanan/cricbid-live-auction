@@ -49,6 +49,29 @@ DISTRICT_URL = (
     "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735"
     "?frmtid=Mm5dpqTqJz&fromdate=2026-12-21"
 )
+DEFAULT_MOVIES = [
+    {
+        "id": "avengers_doomsday",
+        "title": "Avengers: Doomsday",
+        "bms_url": (
+            "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/buytickets/"
+            "ET00526306/20261221?etCodes=*&language=english&refEventCode=ET00526306"
+        ),
+        "district_url": (
+            "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735"
+            "?frmtid=Mm5dpqTqJz&fromdate=2026-12-21"
+        ),
+    },
+    {
+        "id": "dune_part_three",
+        "title": "Dune: Part Three",
+        "bms_url": (
+            "https://in.bookmyshow.com/movies/chennai/dune-part-three/buytickets/"
+            "ET00491771/20261219?etCodes=*&language=english&refEventCode=ET00491771"
+        ),
+        "district_url": None,
+    },
+]
 DEFAULT_STATE_FILE = "bms_theatres_state.json"
 DEFAULT_NTFY_SERVER = "https://ntfy.sh"
 DEFAULT_NTFY_TOPIC = "nandy-bms-avengers-2026"
@@ -186,14 +209,14 @@ def _webhook(url: Optional[str], text: str):
 
 
 def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
-               booking_url: str, args):
+               booking_url: str, args, movie_title: str = "Avengers Doomsday"):
     """Trigger ALL enabled alert channels for newly discovered theatres."""
     names = [t["name"] for t in new_theatres]
     plain_list = ", ".join(names)
 
     # ── 1. Terminal banner ───────────────────────────────────────────────────
     print("\n" + "=" * 65)
-    print(f"{C.G}{C.BOLD}🚨🚨 [{source.upper()}] NEW THEATRES OPENED FOR BOOKING! 🚨🚨{C.X}")
+    print(f"{C.G}{C.BOLD}🚨🚨 [{source.upper()}] NEW THEATRES OPENED FOR {movie_title.upper()}! 🚨🚨{C.X}")
     for t in new_theatres:
         shows = ", ".join(t["shows"]) if t["shows"] else "shows pending"
         print(f"{C.B}  • {t['name']}{C.X}")
@@ -204,18 +227,18 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
 
     # ── 2. macOS desktop notification & DND overrides ───────────────────────
     _macos_notify(
-        title=f"🎬 [{source}] Booking Open!",
+        title=f"🎬 [{source}] {movie_title}: Booking Open!",
         msg=f"{len(names)} theatre(s): {plain_list[:120]}",
         sound="Hero"
     )
     if not args.no_sound:
         _macos_sound()
-        _macos_voice(f"Alert! New theatres opened on {source} for Avengers Doomsday!")
+        _macos_voice(f"Alert! New theatres opened on {source} for {movie_title}!")
 
     # On-screen modal alert (pops up over all windows, breaks through DND)
     _macos_modal_alert(
-        title=f"🚨 [{source}] Booking Open!",
-        msg=f"{len(names)} new theatre(s) open:\n{plain_list}\n\nClick 'Book Now' to open your browser.",
+        title=f"🚨 [{source}] {movie_title} Booking Open!",
+        msg=f"{len(names)} new theatre(s) open for {movie_title}:\n{plain_list}\n\nClick 'Book Now' to open your browser.",
         url=booking_url
     )
 
@@ -230,8 +253,8 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
                   for t in new_theatres]
     _ntfy(
         topic=args.ntfy_topic,
-        title=f"[{source}] Avengers Doomsday: {len(new_theatres)} new theatre(s)!",
-        body="\n".join(ntfy_lines) + "\n\nTap 'Book Now' to open the site.",
+        title=f"[{source}] {movie_title}: {len(new_theatres)} new theatre(s)!",
+        body="\n".join(ntfy_lines) + f"\n\nTap to book tickets for {movie_title}!",
         url=booking_url,
         server=args.ntfy_server,
     )
@@ -241,12 +264,45 @@ def fire_alert(source: str, new_theatres: List[Dict[str, Any]],
         f"• <b>{t['name']}</b> ({len(t['shows'])} shows)" for t in new_theatres
     )
     _telegram(args.telegram_token, args.telegram_chat_id,
-              f"🚨 <b>[{source}] BOOKING OPENED!</b>\n\n{tg_lines}\n\n"
+              f"🚨 <b>[{source}] {movie_title} BOOKING OPENED!</b>\n\n{tg_lines}\n\n"
               f"🔗 <a href=\"{booking_url}\">Book on {source}</a>")
 
     # ── 5. Webhook ───────────────────────────────────────────────────────────
     _webhook(args.webhook_url,
-             f"🚨 [{source}] BOOKING OPENED: {plain_list}\n{booking_url}")
+             f"🚨 [{source}] {movie_title} BOOKING OPENED: {plain_list}\n{booking_url}")
+
+
+def fire_date_alert(source: str, new_dates: List[str],
+                    booking_url: str, args, movie_title: str = "Avengers Doomsday"):
+    """Trigger alerts when new show dates open up on BMS or District."""
+    date_str = ", ".join(sorted(new_dates))
+    log(f"[{source}] 🗓 {movie_title} — New dates open: {date_str}", C.G)
+
+    _macos_notify(
+        title=f"🗓 [{source}] {movie_title}: New Dates!",
+        msg=f"Dates: {date_str}",
+        sound="Ping"
+    )
+    if not args.no_sound:
+        _macos_sound()
+        _macos_voice(f"New dates opened on {source} for {movie_title}!")
+
+    _ntfy(
+        topic=args.ntfy_topic,
+        title=f"[{source}] {movie_title}: New Dates Open!",
+        body=f"🗓️ New dates available: {date_str}\n\nTap to book tickets now!",
+        url=booking_url,
+        server=args.ntfy_server,
+    )
+
+    _telegram(
+        args.telegram_token, args.telegram_chat_id,
+        f"🗓️ <b>[{source}] {movie_title} NEW DATES OPEN!</b>\n\nDates: {date_str}\n\n"
+        f"🔗 <a href=\"{booking_url}\">Book on {source}</a>"
+    )
+
+    _webhook(args.webhook_url,
+             f"🗓️ [{source}] {movie_title} NEW DATES: {date_str}\n{booking_url}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -461,24 +517,36 @@ def district_extract(nd: Dict) -> Tuple[Dict[str, Dict], List[str]]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def load_state(path: str) -> Dict:
-    default_state = {
-        "bms": {"theatres": {}, "dates": []},
-        "district": {"theatres": {}, "dates": []}
-    }
+    state = {}
     if os.path.exists(path):
         try:
             with open(path) as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    if "bms" in data and "district" in data:
-                        return data
-                    if "theatres" in data:
-                        default_state["bms"]["theatres"] = data.get("theatres", {})
-                        default_state["bms"]["dates"] = data.get("dates", [])
-                        return default_state
+                    # Check if legacy flat state (only had "bms" / "district")
+                    if "bms" in data or "district" in data:
+                        state["avengers_doomsday"] = {
+                            "bms": data.get("bms", {"theatres": {}, "dates": []}),
+                            "district": data.get("district", {"theatres": {}, "dates": []})
+                        }
+                    else:
+                        state = data
         except Exception:
-            pass
-    return default_state
+            state = {}
+
+    for m in DEFAULT_MOVIES:
+        mid = m["id"]
+        if mid not in state:
+            state[mid] = {
+                "bms": {"theatres": {}, "dates": []},
+                "district": {"theatres": {}, "dates": []}
+            }
+        else:
+            if "bms" not in state[mid]:
+                state[mid]["bms"] = {"theatres": {}, "dates": []}
+            if "district" not in state[mid]:
+                state[mid]["district"] = {"theatres": {}, "dates": []}
+    return state
 
 
 def save_state(path: str, data: Dict):
@@ -504,113 +572,126 @@ def run_monitor(args):
         log(f"Reset state file: {args.state_file}", C.Y)
 
     state = load_state(args.state_file)
-    known = {
-        "bms":      set(state["bms"]["theatres"].keys()),
-        "district": set(state["district"]["theatres"].keys()),
-    }
-    known_dates = {
-        "bms":      set(state["bms"]["dates"]),
-        "district": set(state["district"]["dates"]),
-    }
+
+    # Determine movies to monitor:
+    # If custom CLI arguments were provided that differ from the Avengers defaults,
+    # monitor only that custom single target. Otherwise, monitor all DEFAULT_MOVIES.
+    custom_run = (args.bms_url != BMS_URL or args.district_url != DISTRICT_URL)
+    if custom_run:
+        movies = [{
+            "id": "custom",
+            "title": "Movie",
+            "bms_url": args.bms_url,
+            "district_url": args.district_url,
+        }]
+    else:
+        movies = DEFAULT_MOVIES
 
     # ── Banner ────────────────────────────────────────────────────────────────
     print(f"{C.BOLD}{C.B}" + "=" * 65)
-    print("🎬  Avengers: Doomsday — Cinema Booking Monitor")
-    print("    Watching: BookMyShow  +  District")
+    print("🎬  Cinema Booking Monitor — Chennai (BMS + District)")
+    for m in movies:
+        print(f"    • {m['title']}")
     print("=" * 65 + C.X)
-    print(f"BMS URL:      {args.bms_url}")
-    print(f"District URL: {args.district_url}")
     print(f"Interval:     {args.interval}s (±3s jitter)")
     if args.ntfy_topic:
         print(f"📱 iPhone:    ntfy topic '{args.ntfy_topic}' on {args.ntfy_server}")
     else:
         print("📱 iPhone:    NOT set  (use --ntfy-topic to enable)")
-    if known["bms"]:
-        print(f"BMS known theatres ({len(known['bms'])}): "
-              + ", ".join(state["bms"]["theatres"].values()))
-    if known["district"]:
-        print(f"District known theatres ({len(known['district'])}): "
-              + ", ".join(state["district"]["theatres"].values()))
+    for m in movies:
+        mid = m["id"]
+        m_state = state.get(mid, {"bms": {"theatres": {}, "dates": []}, "district": {"theatres": {}, "dates": []}})
+        bms_th = list(m_state["bms"]["theatres"].values())
+        dist_th = list(m_state["district"]["theatres"].values())
+        bms_summary = f"{len(bms_th)} ({', '.join(bms_th)})" if bms_th else "0 known"
+        dist_summary = f"{len(dist_th)} ({', '.join(dist_th)})" if dist_th else "0 known"
+        print(f"[{m['title']}] Known BMS: {bms_summary} | District: {dist_summary}")
     print("-" * 65)
 
-    errors = {"bms": 0, "district": 0}
+    errors = {m["id"]: {"bms": 0, "district": 0} for m in movies}
 
     while True:
         try:
-            # ── BookMyShow ────────────────────────────────────────────────────
-            bms_state = _bms_fetch(session, args.bms_url, args)
-            if bms_state:
-                errors["bms"] = 0
-                theatres, dates = bms_extract(bms_state)
-                new_codes = set(theatres) - known["bms"]
-                new_dates = set(dates) - known_dates["bms"]
+            for m in movies:
+                mid = m["id"]
+                title = m["title"]
+                m_state = state.setdefault(mid, {
+                    "bms": {"theatres": {}, "dates": []},
+                    "district": {"theatres": {}, "dates": []}
+                })
 
-                log(f"[BMS] {len(theatres)} theatre(s) | dates: {', '.join(dates) or 'N/A'}", C.B)
-                for code, t in theatres.items():
-                    pfx = f"  {C.G}{C.BOLD}⭐ [NEW] " if code in new_codes else "  👉 "
-                    shows_str = ", ".join(t["shows"]) or "shows pending"
-                    print(f"{pfx}{t['name']} ({code}): {shows_str}{C.X}")
+                known_bms = set(m_state["bms"]["theatres"].keys())
+                known_dates_bms = set(m_state["bms"]["dates"])
 
-                if new_codes and known["bms"]:
-                    fire_alert("BookMyShow",
-                               [theatres[c] for c in new_codes],
-                               args.bms_url, args)
-                elif new_codes:
-                    log(f"[BMS] Baseline set: {len(new_codes)} theatre(s)", C.G)
+                known_dist = set(m_state["district"]["theatres"].keys())
+                known_dates_dist = set(m_state["district"]["dates"])
 
-                if new_dates and known_dates["bms"]:
-                    log(f"[BMS] 🗓 New dates: {', '.join(new_dates)}", C.G)
-                    _macos_notify("🗓 BMS: New Dates!", f"Dates: {', '.join(new_dates)}", "Ping")
-                    _ntfy(args.ntfy_topic, "BMS: New dates open!",
-                          f"New dates: {', '.join(new_dates)}",
-                          args.bms_url, args.ntfy_server)
+                # ── BookMyShow ────────────────────────────────────────────────
+                if m.get("bms_url"):
+                    bms_state = _bms_fetch(session, m["bms_url"], args)
+                    if bms_state:
+                        errors[mid]["bms"] = 0
+                        theatres, dates = bms_extract(bms_state)
+                        new_codes = set(theatres) - known_bms
+                        new_dates = set(dates) - known_dates_bms
 
-                known["bms"].update(new_codes)
-                known_dates["bms"].update(dates)
-                state["bms"]["theatres"] = {c: theatres[c]["name"] for c in known["bms"]
-                                             if c in theatres}
-                state["bms"]["dates"] = list(known_dates["bms"])
-            else:
-                errors["bms"] += 1
-                log(f"[BMS] Error #{errors['bms']} — skipping", C.Y)
+                        log(f"[{title} | BMS] {len(theatres)} theatre(s) | dates: {', '.join(dates) or 'N/A'}", C.B)
+                        for code, t in theatres.items():
+                            pfx = f"  {C.G}{C.BOLD}⭐ [NEW] " if code in new_codes else "  👉 "
+                            shows_str = ", ".join(t["shows"]) or "shows pending"
+                            print(f"{pfx}{t['name']} ({code}): {shows_str}{C.X}")
 
-            # ── District ──────────────────────────────────────────────────────
-            dist_nd = _district_fetch(session, args.district_url, args)
-            if dist_nd:
-                errors["district"] = 0
-                theatres_d, dates_d = district_extract(dist_nd)
-                new_codes_d = set(theatres_d) - known["district"]
-                new_dates_d = set(dates_d) - known_dates["district"]
+                        if new_codes and known_bms:
+                            fire_alert("BookMyShow",
+                                       [theatres[c] for c in new_codes],
+                                       m["bms_url"], args, movie_title=title)
+                        elif new_codes:
+                            log(f"[{title} | BMS] Baseline set: {len(new_codes)} theatre(s)", C.G)
 
-                log(f"[District] {len(theatres_d)} theatre(s) | dates: {', '.join(dates_d) or 'N/A'}", M := C.M)
-                for code, t in theatres_d.items():
-                    pfx = f"  {C.G}{C.BOLD}⭐ [NEW] " if code in new_codes_d else "  👉 "
-                    shows_str = ", ".join(t["shows"]) or "shows pending"
-                    print(f"{pfx}{t['name']} ({code}): {shows_str}{C.X}")
+                        if new_dates and known_dates_bms:
+                            fire_date_alert("BookMyShow", list(new_dates), m["bms_url"], args, movie_title=title)
 
-                if new_codes_d and known["district"]:
-                    fire_alert("District",
-                               [theatres_d[c] for c in new_codes_d],
-                               f"https://www.district.in{theatres_d[list(new_codes_d)[0]].get('url', '')}",
-                               args)
-                elif new_codes_d:
-                    log(f"[District] Baseline set: {len(new_codes_d)} theatre(s)", C.G)
+                        known_bms.update(new_codes)
+                        known_dates_bms.update(dates)
+                        m_state["bms"]["theatres"] = {c: theatres[c]["name"] for c in known_bms if c in theatres}
+                        m_state["bms"]["dates"] = list(known_dates_bms)
+                    else:
+                        errors[mid]["bms"] += 1
+                        log(f"[{title} | BMS] Error #{errors[mid]['bms']} — skipping", C.Y)
 
-                if new_dates_d and known_dates["district"]:
-                    log(f"[District] 🗓 New dates: {', '.join(new_dates_d)}", C.G)
-                    _macos_notify("🗓 District: New Dates!", f"Dates: {', '.join(new_dates_d)}", "Ping")
-                    _ntfy(args.ntfy_topic, "District: New dates open!",
-                          f"New dates: {', '.join(new_dates_d)}",
-                          args.district_url, args.ntfy_server)
+                # ── District ──────────────────────────────────────────────────
+                if m.get("district_url"):
+                    dist_nd = _district_fetch(session, m["district_url"], args)
+                    if dist_nd:
+                        errors[mid]["district"] = 0
+                        theatres_d, dates_d = district_extract(dist_nd)
+                        new_codes_d = set(theatres_d) - known_dist
+                        new_dates_d = set(dates_d) - known_dates_dist
 
-                known["district"].update(new_codes_d)
-                known_dates["district"].update(dates_d)
-                state["district"]["theatres"] = {c: theatres_d[c]["name"] for c in known["district"]
-                                                  if c in theatres_d}
-                state["district"]["dates"] = list(known_dates["district"])
-            else:
-                errors["district"] += 1
-                log(f"[District] Error #{errors['district']} — skipping", C.Y)
+                        log(f"[{title} | District] {len(theatres_d)} theatre(s) | dates: {', '.join(dates_d) or 'N/A'}", C.M)
+                        for code, t in theatres_d.items():
+                            pfx = f"  {C.G}{C.BOLD}⭐ [NEW] " if code in new_codes_d else "  👉 "
+                            shows_str = ", ".join(t["shows"]) or "shows pending"
+                            print(f"{pfx}{t['name']} ({code}): {shows_str}{C.X}")
+
+                        if new_codes_d and known_dist:
+                            booking_target = f"https://www.district.in{theatres_d[list(new_codes_d)[0]].get('url', '')}" if new_codes_d else m["district_url"]
+                            fire_alert("District",
+                                       [theatres_d[c] for c in new_codes_d],
+                                       booking_target, args, movie_title=title)
+                        elif new_codes_d:
+                            log(f"[{title} | District] Baseline set: {len(new_codes_d)} theatre(s)", C.G)
+
+                        if new_dates_d and known_dates_dist:
+                            fire_date_alert("District", list(new_dates_d), m["district_url"], args, movie_title=title)
+
+                        known_dist.update(new_codes_d)
+                        known_dates_dist.update(dates_d)
+                        m_state["district"]["theatres"] = {c: theatres_d[c]["name"] for c in known_dist if c in theatres_d}
+                        m_state["district"]["dates"] = list(known_dates_dist)
+                    else:
+                        errors[mid]["district"] += 1
+                        log(f"[{title} | District] Error #{errors[mid]['district']} — skipping", C.Y)
 
             save_state(args.state_file, state)
 
@@ -699,7 +780,8 @@ def main():
                 {"name": "Sathyam Cinemas (SPI), Royapettah", "shows": ["11:00 AM (ENG)", "03:15 PM (ENG)"]}
             ],
             BMS_URL,
-            args
+            args,
+            movie_title="Dune 3 & Avengers"
         )
         print(f"{C.G}Test alert completed!{C.X}")
         return
