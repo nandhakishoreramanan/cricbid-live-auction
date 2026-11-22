@@ -42,32 +42,29 @@ except ImportError:
 
 # ── Default configuration ──────────────────────────────────────────────────────
 BMS_URL = (
-    "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/buytickets/"
-    "ET00526306/20261221?etCodes=*&language=english&refEventCode=ET00526306"
+    "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/buytickets/ET00526306"
 )
 DISTRICT_URL = (
     "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735"
-    "?frmtid=Mm5dpqTqJz&fromdate=2026-12-21"
+    "?frmtid=Mm5dpqTqJz"
 )
 DEFAULT_MOVIES = [
     {
         "id": "avengers_doomsday",
         "title": "Avengers: Doomsday",
         "bms_url": (
-            "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/buytickets/"
-            "ET00526306/20261221?etCodes=*&language=english&refEventCode=ET00526306"
+            "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/buytickets/ET00526306"
         ),
         "district_url": (
             "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735"
-            "?frmtid=Mm5dpqTqJz&fromdate=2026-12-21"
+            "?frmtid=Mm5dpqTqJz"
         ),
     },
     {
         "id": "dune_part_three",
         "title": "Dune: Part Three",
         "bms_url": (
-            "https://in.bookmyshow.com/movies/chennai/dune-part-three/buytickets/"
-            "ET00491771/20261219?etCodes=*&language=english&refEventCode=ET00491771"
+            "https://in.bookmyshow.com/movies/chennai/dune-part-three/buytickets/ET00491771"
         ),
         "district_url": None,
     },

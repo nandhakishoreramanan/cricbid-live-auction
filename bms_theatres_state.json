@@ -2,45 +2,57 @@
   "avengers_doomsday": {
     "bms": {
       "theatres": {
-        "CBMC": "Cinepolis: BSR Mall, OMR, Thoraipakkam"
+        "CBMC": "Cinepolis: BSR Mall, OMR, Thoraipakkam",
+        "INPR": "INOX: LUXE Phoenix Market City, Velachery",
+        "PVSR": "PVR: Sathyam, Royapettah",
+        "INTO": "INOX: The Marina Mall, OMR",
+        "PABC": "PVR: Aerohub, Chennai",
+        "PCAN": "PVR: VR Chennai, Anna Nagar",
+        "PVPZ": "PVR: Palazzo, The Nexus Vijaya Mall",
+        "PVES": "HDFC Millennia PVR: Escape-Express Avenue Mall"
       },
       "dates": [
-        "20261222",
-        "20261223",
-        "20261221",
-        "20261219",
-        "20261218",
         "20261217",
-        "20261220"
+        "20261218",
+        "20261219",
+        "20261220",
+        "20261221",
+        "20261222",
+        "20261223"
       ]
     },
     "district": {
       "theatres": {
+        "1037033": "Sangam Cinemas (4K RGB Laser Dolby Atmos 64CH | Couple Sofa), Kilpauk, Chennai",
+        "1022274": "PVR Palazzo, The Nexus Vijaya Mall, Chennai",
+        "1020778": "INOX The Marina Mall OMR, Egatoor, Chennai",
+        "1022304": "PVR VR Mall, Anna Nagar, Chennai",
         "5059": "Kamala Cinemas 4K RGB Laser Dolby, Vadapalani, Chennai",
-        "9505": "Cinepolis BSR Mall OMR, Thoraipakkam, Chennai"
+        "1022244": "PVR Sathyam, Royapettah, Chennai",
+        "1022289": "PVR Aerohub, Chennai (Audi 3-All New 3D Projection)",
+        "1020779": "INOX Phoenix Market City (formerly Jazz Cinemas), Velachery, Chennai",
+        "9505": "Cinepolis BSR Mall OMR, Thoraipakkam, Chennai",
+        "1022257": "HDFC Millennia PVR Escape-Express Avenue Mall, Chennai"
       },
       "dates": [
+        "2026-12-17",
         "2026-12-18",
         "2026-12-19",
-        "2026-12-21",
-        "2026-12-17",
         "2026-12-20",
-        "2026-12-23",
-        "2026-12-22"
+        "2026-12-21",
+        "2026-12-22",
+        "2026-12-23"
       ]
     }
   },
   "dune_part_three": {
     "bms": {
       "theatres": {
-        "INPR": "INOX: LUXE Phoenix Market City, Velachery"
+        "INTO": "INOX: The Marina Mall, OMR",
+        "PCAN": "PVR: VR Chennai, Anna Nagar"
       },
       "dates": [
-        "20261216",
-        "20261219",
-        "20261218",
-        "20261217",
-        "20261220"
+        "20261216"
       ]
     },
     "district": {
