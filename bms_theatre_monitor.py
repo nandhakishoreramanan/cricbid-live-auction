@@ -418,14 +418,30 @@ def bms_extract(state: Dict) -> Tuple[Dict[str, Dict], List[str]]:
                     vcode = ad.get("venueCode")
                     if not vname or not vcode:
                         continue
-                    shows = []
+                    # Group shows by showDateCode
+                    date_shows: Dict[str, List[str]] = {}
                     for sec in card.get("showtimesSections", []):
                         for st in sec.get("showtimes", []):
                             t = st.get("title")
                             lang = st.get("subtitleAcronym", "")
+                            sd = st.get("additionalData", {}).get("showDateCode") or (dates[0] if dates else "")
                             if t:
-                                shows.append(f"{t} ({lang})" if lang else t)
-                    theatres[vcode] = {"name": vname, "code": vcode, "shows": shows}
+                                show_str = f"{t} ({lang})" if lang else t
+                                date_shows.setdefault(sd, []).append(show_str)
+
+                    if not date_shows:
+                        date_shows[""] = []
+
+                    for sdate, shows in date_shows.items():
+                        key = f"{vcode}_{sdate}" if sdate else vcode
+                        display_name = f"{vname} [{sdate}]" if sdate else vname
+                        theatres[key] = {
+                            "name": display_name,
+                            "venue_name": vname,
+                            "code": vcode,
+                            "date": sdate,
+                            "shows": shows,
+                        }
 
     return theatres, dates
 
@@ -481,28 +497,34 @@ def district_extract(nd: Dict) -> Tuple[Dict[str, Dict], List[str]]:
                 if not cinema_name or not cinema_code:
                     continue
 
-                shows = []
-                # Build a human-readable language label from the session data
-                _lang_map = {}  # Build from filterBuckets if available
+                date_shows: Dict[str, List[str]] = {}
                 for sess in sessions:
                     show_time = sess.get("showTimeText", "")
-                    # Prefer human label; fall back to format code
+                    sdate = sess.get("showDate") or sess.get("sessionDate") or ""
                     lang = (sess.get("language")
                             or sess.get("languageLabel")
                             or sess.get("subtitle")
                             or "")
-                    # If lang is still the opaque key (Mm5dpqTqJz-style), replace with "ENG"
                     if lang and len(lang) > 10 and not any(c.isspace() for c in lang):
                         lang = "ENG"
                     if show_time:
-                        shows.append(f"{show_time} ({lang})" if lang else show_time)
+                        lbl = f"{show_time} ({lang})" if lang else show_time
+                        date_shows.setdefault(sdate, []).append(lbl)
 
-                theatres[cinema_code] = {
-                    "name": cinema_name,
-                    "code": cinema_code,
-                    "url": cinema_url,
-                    "shows": shows,
-                }
+                if not date_shows:
+                    date_shows[""] = []
+
+                for sdate, shows in date_shows.items():
+                    key = f"{cinema_code}_{sdate}" if sdate else cinema_code
+                    display_name = f"{cinema_name} [{sdate}]" if sdate else cinema_name
+                    theatres[key] = {
+                        "name": display_name,
+                        "venue_name": cinema_name,
+                        "code": cinema_code,
+                        "url": cinema_url,
+                        "date": sdate,
+                        "shows": shows,
+                    }
     except Exception as e:
         log(f"[District] extract error: {e}", C.R)
 
