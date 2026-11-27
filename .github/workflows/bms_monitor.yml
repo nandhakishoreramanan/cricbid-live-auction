@@ -13,6 +13,11 @@ on:
   repository_dispatch:        # External webhook trigger (e.g., cron-job.org, curl)
     types: [bms-trigger, daily-trigger]
 
+# Ensure ONLY ONE runner executes at any given time (prevents duplicate ScraperAPI consumption)
+concurrency:
+  group: bms-monitor-runner
+  cancel-in-progress: true
+
 permissions:
   contents: write             # Needed to commit state file back
   actions: write              # Allows self-triggering next run to keep 24/7 continuous chain alive
