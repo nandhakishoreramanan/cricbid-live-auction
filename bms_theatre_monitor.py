@@ -100,56 +100,93 @@ def log(msg: str, color: str = ""):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _macos_notify(title: str, msg: str, sound: str = "Glass"):
-    try:
-        script = f'display notification "{msg}" with title "{title}" sound name "{sound}"'
-        subprocess.run(["osascript", "-e", script],
-                       check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
+    if sys.platform == "darwin":
+        try:
+            script = f'display notification "{msg}" with title "{title}" sound name "{sound}"'
+            subprocess.run(["osascript", "-e", script],
+                           check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    elif sys.platform == "win32":
+        try:
+            import ctypes
+            # Non-blocking balloon / message
+            ctypes.windll.user32.MessageBeep(0x00000030)
+        except Exception:
+            pass
 
 
 def _macos_sound(path: str = "/System/Library/Sounds/Glass.aiff"):
-    """Plays audio chime directly through macOS audio engine (bypasses DND)."""
-    try:
-        subprocess.Popen(["afplay", path],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
+    """Plays audio chime directly through macOS audio engine or Windows winsound (bypasses DND)."""
+    if sys.platform == "darwin":
+        try:
+            subprocess.Popen(["afplay", path],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    elif sys.platform == "win32":
+        try:
+            import winsound
+            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        except Exception:
+            pass
 
 
 def _macos_voice(text: str):
-    """Speaks through macOS TTS synthesizer aloud (bypasses DND)."""
-    try:
-        subprocess.Popen(["say", "-v", "Samantha", text],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
+    """Speaks aloud through system TTS synthesizer (macOS 'say' or Windows Speech SAPI)."""
+    if sys.platform == "darwin":
+        try:
+            subprocess.Popen(["say", "-v", "Samantha", text],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    elif sys.platform == "win32":
+        try:
+            safe_text = text.replace("'", "").replace('"', '')
+            cmd = f'powershell -WindowStyle Hidden -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{safe_text}\')"'
+            subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
 
 def _macos_modal_alert(title: str, msg: str, url: str):
     """
     Displays a prominent on-screen modal alert that breaks through Do Not Disturb.
     Has a 'Book Now' button that opens the booking website directly in your browser.
+    Works on both macOS and Windows.
     """
+    import threading, webbrowser
     def _run():
-        try:
-            safe_title = title.replace('"', '\\"')
-            safe_msg = msg.replace('"', '\\"')
-            script = f'''
-            tell application "System Events"
-                activate
-                set userChoice to button returned of (display alert "{safe_title}" message "{safe_msg}" as critical buttons {{"Dismiss", "Book Now"}} default button "Book Now" giving up after 60)
-                if userChoice is "Book Now" then
-                    open location "{url}"
-                end if
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", script], check=False,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        if sys.platform == "darwin":
+            try:
+                safe_title = title.replace('"', '\\"')
+                safe_msg = msg.replace('"', '\\"')
+                script = f'''
+                tell application "System Events"
+                    activate
+                    set userChoice to button returned of (display alert "{safe_title}" message "{safe_msg}" as critical buttons {{"Dismiss", "Book Now"}} default button "Book Now" giving up after 60)
+                    if userChoice is "Book Now" then
+                        open location "{url}"
+                    end if
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", script], check=False,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        elif sys.platform == "win32":
+            try:
+                # Windows MessageBox: 1 = OK/Cancel, 0x30 = Warning Icon, 0x40000 = TopMost
+                import ctypes
+                result = ctypes.windll.user32.MessageBoxW(0, f"{msg}\n\nClick OK to open the booking page now!", title, 0x01 | 0x30 | 0x40000)
+                if result == 1:  # User clicked OK / Book Now
+                    webbrowser.open(url)
+            except Exception:
+                try:
+                    webbrowser.open(url)
+                except Exception:
+                    pass
 
-    import threading
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
