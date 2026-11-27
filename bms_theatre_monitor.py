@@ -128,8 +128,13 @@ def _macos_sound(path: str = "/System/Library/Sounds/Glass.aiff"):
         try:
             import winsound
             winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            for freq in (1000, 1500, 2000):
+                winsound.Beep(freq, 180)
         except Exception:
-            pass
+            try:
+                subprocess.Popen('powershell -WindowStyle Hidden -Command "[console]::beep(1000, 200); [console]::beep(1500, 250)"', shell=True)
+            except Exception:
+                pass
 
 
 def _macos_voice(text: str):
