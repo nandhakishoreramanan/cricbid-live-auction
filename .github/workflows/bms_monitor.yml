@@ -10,6 +10,8 @@ on:
         required: false
         type: boolean
         default: false
+  repository_dispatch:        # External webhook trigger (e.g., cron-job.org, curl)
+    types: [bms-trigger, daily-trigger]
 
 permissions:
   contents: write             # Needed to commit state file back

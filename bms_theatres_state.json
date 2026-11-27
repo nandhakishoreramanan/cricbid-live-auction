@@ -2,43 +2,43 @@
   "avengers_doomsday": {
     "bms": {
       "theatres": {
-        "INPR_20261217": "INOX: LUXE Phoenix Market City, Velachery [20261217]",
-        "INTO_20261217": "INOX: The Marina Mall, OMR [20261217]",
-        "PABC_20261217": "PVR: Aerohub, Chennai [20261217]",
-        "PCAN_20261217": "PVR: VR Chennai, Anna Nagar [20261217]",
         "PVES_20261217": "HDFC Millennia PVR: Escape-Express Avenue Mall [20261217]",
         "PVPZ_20261217": "PVR: Palazzo, The Nexus Vijaya Mall [20261217]",
-        "PVSR_20261217": "PVR: Sathyam, Royapettah [20261217]"
+        "PVSR_20261217": "PVR: Sathyam, Royapettah [20261217]",
+        "PCAN_20261217": "PVR: VR Chennai, Anna Nagar [20261217]",
+        "INTO_20261217": "INOX: The Marina Mall, OMR [20261217]",
+        "INPR_20261217": "INOX: LUXE Phoenix Market City, Velachery [20261217]",
+        "PABC_20261217": "PVR: Aerohub, Chennai [20261217]"
       },
       "dates": [
-        "20261217",
+        "20261222",
+        "20261221",
         "20261218",
+        "20261217",
         "20261219",
         "20261220",
-        "20261221",
-        "20261222",
         "20261223"
       ]
     },
     "district": {
       "theatres": {
+        "1020779_2026-12-17": "INOX Phoenix Market City (formerly Jazz Cinemas), Velachery, Chennai [2026-12-17]",
+        "1022257_2026-12-17": "HDFC Millennia PVR Escape-Express Avenue Mall, Chennai [2026-12-17]",
+        "1022244_2026-12-17": "PVR Sathyam, Royapettah, Chennai [2026-12-17]",
+        "1022274_2026-12-17": "PVR Palazzo, The Nexus Vijaya Mall, Chennai [2026-12-17]",
+        "5059_2026-12-17": "Kamala Cinemas 4K RGB Laser Dolby, Vadapalani, Chennai [2026-12-17]",
         "1022289_2026-12-17": "PVR Aerohub, Chennai (Audi 3-All New 3D Projection) [2026-12-17]",
+        "1022304_2026-12-17": "PVR VR Mall, Anna Nagar, Chennai [2026-12-17]",
+        "1102122_2026-12-17": "Seven Screen's Cinemas, Kilambakkam, Chennai [2026-12-17]",
         "9505_2026-12-17": "Cinepolis BSR Mall OMR, Thoraipakkam, Chennai [2026-12-17]",
         "1020778_2026-12-17": "INOX The Marina Mall OMR, Egatoor, Chennai [2026-12-17]",
-        "1037033_2026-12-17": "Sangam Cinemas (4K RGB Laser Dolby Atmos 64CH | Couple Sofa), Kilpauk, Chennai [2026-12-17]",
-        "1022274_2026-12-17": "PVR Palazzo, The Nexus Vijaya Mall, Chennai [2026-12-17]",
-        "1022257_2026-12-17": "HDFC Millennia PVR Escape-Express Avenue Mall, Chennai [2026-12-17]",
-        "5059_2026-12-17": "Kamala Cinemas 4K RGB Laser Dolby, Vadapalani, Chennai [2026-12-17]",
-        "1020779_2026-12-17": "INOX Phoenix Market City (formerly Jazz Cinemas), Velachery, Chennai [2026-12-17]",
-        "1022244_2026-12-17": "PVR Sathyam, Royapettah, Chennai [2026-12-17]",
-        "1022304_2026-12-17": "PVR VR Mall, Anna Nagar, Chennai [2026-12-17]",
-        "1102122_2026-12-17": "Seven Screen's Cinemas, Kilambakkam, Chennai [2026-12-17]"
+        "1037033_2026-12-17": "Sangam Cinemas (4K RGB Laser Dolby Atmos 64CH | Couple Sofa), Kilpauk, Chennai [2026-12-17]"
       },
       "dates": [
+        "2026-12-20",
+        "2026-12-19",
         "2026-12-17",
         "2026-12-18",
-        "2026-12-19",
-        "2026-12-20",
         "2026-12-21",
         "2026-12-22",
         "2026-12-23"
@@ -48,8 +48,8 @@
   "dune_part_three": {
     "bms": {
       "theatres": {
-        "INTO_20261216": "INOX: The Marina Mall, OMR [20261216]",
-        "PCAN_20261216": "PVR: VR Chennai, Anna Nagar [20261216]"
+        "PCAN_20261216": "PVR: VR Chennai, Anna Nagar [20261216]",
+        "INTO_20261216": "INOX: The Marina Mall, OMR [20261216]"
       },
       "dates": [
         "20261216"
