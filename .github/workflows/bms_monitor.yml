@@ -81,7 +81,7 @@ jobs:
       - name: Trigger next cloud runner in chain
         if: always() && inputs.test_alert != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WORKFLOW_TRIGGER_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           echo "Relaying to next cloud runner in chain..."
           gh workflow run bms_monitor.yml --ref main || true
