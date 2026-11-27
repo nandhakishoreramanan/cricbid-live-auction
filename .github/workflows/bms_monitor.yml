@@ -2,8 +2,8 @@ name: 🎬 BMS + District Theatre Monitor — Avengers & Dune 3
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # Every 5 minutes (GitHub minimum)
-  workflow_dispatch:          # Manual trigger from Actions tab
+    - cron: "*/30 * * * *"   # Safety backup to ensure chain is never broken
+  workflow_dispatch:          # Manual / self-chained runner
     inputs:
       test_alert:
         description: 'Send test notification to iPhone from Cloud'
@@ -13,12 +13,13 @@ on:
 
 permissions:
   contents: write             # Needed to commit state file back
+  actions: write              # Allows self-triggering next run to keep 24/7 continuous chain alive
 
 jobs:
   check-theatres:
     name: Check BookMyShow + District for new theatres
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 50
 
     steps:
       - name: Checkout repository
@@ -35,15 +36,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt --quiet
 
-      # Random 5–25s jitter so requests never hit BMS/District at the
-      # same clock second every 5 minutes (avoids bot-pattern detection)
-      - name: Random startup jitter
-        run: |
-          SLEEP=$((RANDOM % 20 + 5))
-          echo "Sleeping ${SLEEP}s..."
-          sleep $SLEEP
-
-      - name: Check BookMyShow + District for new theatres
+      - name: Check BookMyShow + District for new theatres (Active 40-Min Cloud Loop)
         env:
           NTFY_TOPIC:          ${{ secrets.NTFY_TOPIC }}
           NTFY_SERVER:         ${{ secrets.NTFY_SERVER }}
@@ -59,8 +52,10 @@ jobs:
           if [ "${{ inputs.test_alert }}" = "true" ]; then
             python3 bms_theatre_monitor.py --test-alert --ntfy-topic "${NTFY_TOPIC:-}"
           else
+            # Active 40-minute monitoring loop checking every 3 minutes (180s)
             python3 bms_theatre_monitor.py \
-              --once \
+              --duration 2400 \
+              --interval 180 \
               --state-file bms_theatres_state.json \
               --ntfy-topic  "${NTFY_TOPIC:-}" \
               --ntfy-server "${NTFY_SERVER:-https://ntfy.sh}"
@@ -76,5 +71,15 @@ jobs:
             echo "No state change — nothing to commit."
           else
             git commit -m "chore: update theatre state [skip ci]"
-            git push
+            git pull --rebase origin main || true
+            git push origin main || true
           fi
+
+      # Continuous 24/7 Relay: Dispatches the next runner to keep the cloud awake forever
+      - name: Trigger next cloud runner in chain
+        if: always() && inputs.test_alert != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Relaying to next cloud runner in chain..."
+          gh workflow run bms_monitor.yml --ref main || true

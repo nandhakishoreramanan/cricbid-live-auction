@@ -628,6 +628,7 @@ def run_monitor(args):
     print("-" * 65)
 
     errors = {m["id"]: {"bms": 0, "district": 0} for m in movies}
+    start_time = time.time()
 
     while True:
         try:
@@ -718,6 +719,10 @@ def run_monitor(args):
                 log("Single check done (--once). Exiting.", C.G)
                 break
 
+            if getattr(args, "duration", 0) > 0 and (time.time() - start_time) >= args.duration:
+                log(f"Reached max duration ({args.duration}s). Exiting cleanly for next runner chain.", C.G)
+                break
+
             jitter = random.uniform(-3.0, 3.0)
             time.sleep(max(5.0, args.interval + jitter))
 
@@ -743,6 +748,8 @@ def main():
                    help="District movie URL")
     p.add_argument("-i", "--interval", type=int, default=60,
                    help="Poll interval in seconds (default: 60)")
+    p.add_argument("--duration", type=int, default=0,
+                   help="Max runtime in seconds before exiting (0 = infinite)")
     p.add_argument("--once",   action="store_true",
                    help="Run one check and exit (useful for testing / CI)")
     p.add_argument("--reset",  action="store_true",
