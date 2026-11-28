@@ -365,10 +365,9 @@ BROWSER_HEADERS = {
 def _fetch_html(session: requests.Session, url: str, args) -> Optional[str]:
     """
     Fetches raw HTML from target URL, supporting:
-      1. Direct requests with browser headers
-      2. ScraperAPI (supports multiple keys with automatic failover if tokens run out)
-      3. ZenRows (if --zenrows-key is provided, uses proxy_country=in)
-      4. Custom HTTP/SOCKS5 proxy (if --proxy-url is provided)
+      1. Direct requests with native TLS fingerprinting (bypasses Cloudflare)
+      2. ScraperAPI (if credits available)
+      3. Custom proxy
     """
     import urllib.parse
     scraperapi_key = getattr(args, "scraperapi_key", None)
@@ -376,53 +375,47 @@ def _fetch_html(session: requests.Session, url: str, args) -> Optional[str]:
     zenrows_key = getattr(args, "zenrows_key", None)
     proxy_url = getattr(args, "proxy_url", None)
 
-    # Collect all ScraperAPI keys (supports comma-separated list or backup key)
+    # ── 1. Direct fetch with native curl_cffi fingerprint (fastest & 100% free) ──
+    for profile in ["chrome124", "chrome131", "safari17_0"]:
+        try:
+            s = requests.Session(impersonate=profile)
+            if proxy_url:
+                resp = s.get(url, proxies={"http": proxy_url, "https": proxy_url}, timeout=20)
+            else:
+                resp = s.get(url, timeout=15)
+            if resp.status_code == 200 and len(resp.text) > 10000:
+                return resp.text
+        except Exception:
+            continue
+
+    # ── 2. ScraperAPI fallback (if configured and direct fetch failed) ─────────
     keys = []
     if scraperapi_key:
         keys.extend([k.strip() for k in scraperapi_key.split(",") if k.strip()])
     if backup_key:
         keys.extend([k.strip() for k in backup_key.split(",") if k.strip()])
 
-    try:
-        if keys:
-            for idx, key in enumerate(keys):
+    if keys:
+        for idx, key in enumerate(keys):
+            try:
                 fetch_url = f"https://api.scraperapi.com?api_key={key}&country_code=in&url={urllib.parse.quote(url)}"
-                resp = session.get(fetch_url, timeout=45)
+                resp = session.get(fetch_url, timeout=30)
                 if resp.status_code == 200:
                     return resp.text
-                elif resp.status_code in (401, 402, 403, 429):
-                    continue
-                else:
-                    break
+            except Exception:
+                continue
 
-        # Direct fetch with Safari 17 impersonation (bypasses Cloudflare & needs zero API credits)
+    if zenrows_key:
         try:
-            safari_sess = requests.Session(impersonate="safari17_0")
-            resp = safari_sess.get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-            }, timeout=20)
+            fetch_url = f"https://api.zenrows.com/v1/?apikey={zenrows_key}&url={urllib.parse.quote(url)}&premium_proxy=true&proxy_country=in"
+            resp = session.get(fetch_url, timeout=30)
             if resp.status_code == 200:
                 return resp.text
         except Exception:
             pass
 
-        if zenrows_key:
-            fetch_url = f"https://api.zenrows.com/v1/?apikey={zenrows_key}&url={urllib.parse.quote(url)}&premium_proxy=true&proxy_country=in"
-            resp = session.get(fetch_url, timeout=45)
-        elif proxy_url:
-            resp = session.get(url, headers=BROWSER_HEADERS, proxies={"http": proxy_url, "https": proxy_url}, timeout=25)
-        else:
-            resp = session.get(url, headers=BROWSER_HEADERS, timeout=20)
-
-        if resp.status_code != 200:
-            log(f"HTTP {resp.status_code} for {url[:55]}...", C.R)
-            return None
-        return resp.text
-    except Exception as e:
-        log(f"Fetch error: {e}", C.R)
-        return None
+    log(f"All fetch attempts failed for {url[:55]}...", C.R)
+    return None
 
 
 def _bms_fetch(session: requests.Session, url: str, args) -> Optional[Dict]:
