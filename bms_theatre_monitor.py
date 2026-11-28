@@ -390,14 +390,25 @@ def _fetch_html(session: requests.Session, url: str, args) -> Optional[str]:
                 resp = session.get(fetch_url, timeout=45)
                 if resp.status_code == 200:
                     return resp.text
-                elif resp.status_code in (401, 402, 403, 429) and len(keys) > 1 and idx < len(keys) - 1:
-                    log(f"[ScraperAPI] Key #{idx+1} out of credits (HTTP {resp.status_code}). Switching to backup key...", C.Y)
+                elif resp.status_code in (401, 402, 403, 429):
                     continue
                 else:
-                    log(f"[ScraperAPI] HTTP {resp.status_code} for {url[:55]}...", C.R)
-                    return None
-            return None
-        elif zenrows_key:
+                    break
+
+        # Direct fetch with Safari 17 impersonation (bypasses Cloudflare & needs zero API credits)
+        try:
+            safari_sess = requests.Session(impersonate="safari17_0")
+            resp = safari_sess.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }, timeout=20)
+            if resp.status_code == 200:
+                return resp.text
+        except Exception:
+            pass
+
+        if zenrows_key:
             fetch_url = f"https://api.zenrows.com/v1/?apikey={zenrows_key}&url={urllib.parse.quote(url)}&premium_proxy=true&proxy_country=in"
             resp = session.get(fetch_url, timeout=45)
         elif proxy_url:
