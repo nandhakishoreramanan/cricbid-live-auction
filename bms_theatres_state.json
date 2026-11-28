@@ -3,20 +3,20 @@
     "bms": {
       "theatres": {
         "PABC_20261217": "PVR: Aerohub, Chennai [20261217]",
-        "INTO_20261217": "INOX: The Marina Mall, OMR [20261217]",
-        "PVPZ_20261217": "PVR: Palazzo, The Nexus Vijaya Mall [20261217]",
-        "PVES_20261217": "HDFC Millennia PVR: Escape-Express Avenue Mall [20261217]",
-        "INPR_20261217": "INOX: LUXE Phoenix Market City, Velachery [20261217]",
         "PVSR_20261217": "PVR: Sathyam, Royapettah [20261217]",
-        "PCAN_20261217": "PVR: VR Chennai, Anna Nagar [20261217]"
+        "PCAN_20261217": "PVR: VR Chennai, Anna Nagar [20261217]",
+        "INPR_20261217": "INOX: LUXE Phoenix Market City, Velachery [20261217]",
+        "PVES_20261217": "HDFC Millennia PVR: Escape-Express Avenue Mall [20261217]",
+        "PVPZ_20261217": "PVR: Palazzo, The Nexus Vijaya Mall [20261217]",
+        "INTO_20261217": "INOX: The Marina Mall, OMR [20261217]"
       },
       "dates": [
-        "20261223",
-        "20261220",
         "20261221",
-        "20261222",
-        "20261217",
         "20261218",
+        "20261220",
+        "20261223",
+        "20261217",
+        "20261222",
         "20261219"
       ]
     },
